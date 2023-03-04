@@ -3,8 +3,7 @@ module github.com/akuity/protoc-gen-grpc-gateway-client
 go 1.20
 
 require (
-	github.com/akuity/go-akuity v0.0.0-00010101000000-000000000000
-	github.com/grpc-ecosystem/grpc-gateway v1.16.0
+	github.com/akuity/go-akuity v0.0.0-20230304081857-7177ba20624a
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.15.2
 	github.com/stretchr/testify v1.8.2
 	google.golang.org/genproto v0.0.0-20230303212802-e74f57abe488
@@ -23,5 +22,3 @@ require (
 	golang.org/x/text v0.7.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
-
-replace github.com/akuity/go-akuity => ../go-akuity
