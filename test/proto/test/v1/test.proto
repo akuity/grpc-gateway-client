@@ -1,0 +1,44 @@
+syntax = "proto3";
+
+package io.akuity.test.v1;
+
+import "google/api/annotations.proto";
+
+service TestService {
+  rpc SendInvitation(SendInvitationRequest) returns (SendInvitationResponse) {
+    option (google.api.http) = {
+      post: "/invitation"
+      body: "*"
+    };
+  }
+  rpc TrackInvitation(TrackInvitationRequest) returns (stream TrackInvitationResponse) {
+    option (google.api.http) = {
+      get: "/invitation/{id}"
+    };
+  }
+}
+
+message SendInvitationRequest {
+  string email = 1;
+}
+
+message SendInvitationResponse {
+  string id = 1;
+}
+
+enum EventType {
+  EVENT_TYPE_UNDEFINED = 0;
+  EVENT_TYPE_SEEN = 1;
+  EVENT_TYPE_ACCEPTED = 2;
+  EVENT_TYPE_REJECTED = 3;
+}
+
+message TrackInvitationRequest {
+  string id = 1;
+  optional EventType type = 2;
+}
+
+message TrackInvitationResponse {
+  EventType type = 1;
+  string message = 2;
+}

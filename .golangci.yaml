@@ -1,0 +1,18 @@
+run:
+  go: "1.20"
+
+linters:
+  enable:
+    - gci
+    - gofmt
+
+linters-settings:
+  gci:
+    sections:
+      - standard
+      - default
+      - prefix(github.com/akuity)
+      - dot
+      - blank
+    skip-generated: true
+    custom-order: true
