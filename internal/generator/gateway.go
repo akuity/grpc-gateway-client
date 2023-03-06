@@ -12,6 +12,10 @@ import (
 	"google.golang.org/protobuf/types/descriptorpb"
 )
 
+const (
+	loopValueAccessor = "v"
+)
+
 func getClientInterfaceName(svc *protogen.Service) string {
 	return fmt.Sprintf("%sGatewayClient", svc.GoName)
 }
@@ -101,10 +105,16 @@ func generateQueryParam(
 	queryKeyName := newStructAccessor(queryKeyFields, field.Desc.JSONName())
 	queryValueAccessor := newStructAccessor(structFields, field.GoName)
 
+	// If current field is inside the repeated message, ignore intermediate fields
+	// since the loopValueAccessor directs the current field itself.
+	if len(structFields) > 1 && structFields[0] == loopValueAccessor {
+		queryValueAccessor = newStructAccessor(structFields[:1], field.GoName)
+	}
+
 	if isRepeated {
-		g.P("for _, v := range ", queryValueAccessor, " {")
-		queryValueAccessor = "v"
-		structFields = []string{"v"}
+		g.P("for _, ", loopValueAccessor, " := range ", queryValueAccessor, " {")
+		queryValueAccessor = loopValueAccessor
+		structFields = []string{loopValueAccessor}
 		defer g.P("}")
 	} else if isOptional {
 		g.P("if ", queryValueAccessor, " != nil {")
