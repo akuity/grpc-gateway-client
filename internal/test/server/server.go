@@ -16,6 +16,17 @@ func NewTestServer() testv1.TestServiceServer {
 	return &testServiceServer{}
 }
 
+func (s *testServiceServer) ListInvitations(_ context.Context, req *testv1.ListInvitationsRequest) (*testv1.ListInvitationsResponse, error) {
+	return &testv1.ListInvitationsResponse{
+		Invitations: []*testv1.Invitation{
+			{
+				Id:     "test-invitation",
+				Labels: req.GetQuery().GetLabels(),
+			},
+		},
+	}, nil
+}
+
 func (s *testServiceServer) SendInvitation(_ context.Context, req *testv1.SendInvitationRequest) (*testv1.SendInvitationResponse, error) {
 	return &testv1.SendInvitationResponse{
 		Id: base64.StdEncoding.EncodeToString([]byte(req.Email)),

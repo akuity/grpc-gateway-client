@@ -18,6 +18,7 @@ const _ = grpc.SupportPackageIsVersion7
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type TestServiceClient interface {
+	ListInvitations(ctx context.Context, in *ListInvitationsRequest, opts ...grpc.CallOption) (*ListInvitationsResponse, error)
 	SendInvitation(ctx context.Context, in *SendInvitationRequest, opts ...grpc.CallOption) (*SendInvitationResponse, error)
 	TrackInvitation(ctx context.Context, in *TrackInvitationRequest, opts ...grpc.CallOption) (TestService_TrackInvitationClient, error)
 }
@@ -28,6 +29,15 @@ type testServiceClient struct {
 
 func NewTestServiceClient(cc grpc.ClientConnInterface) TestServiceClient {
 	return &testServiceClient{cc}
+}
+
+func (c *testServiceClient) ListInvitations(ctx context.Context, in *ListInvitationsRequest, opts ...grpc.CallOption) (*ListInvitationsResponse, error) {
+	out := new(ListInvitationsResponse)
+	err := c.cc.Invoke(ctx, "/io.akuity.test.v1.TestService/ListInvitations", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
 }
 
 func (c *testServiceClient) SendInvitation(ctx context.Context, in *SendInvitationRequest, opts ...grpc.CallOption) (*SendInvitationResponse, error) {
@@ -75,6 +85,7 @@ func (x *testServiceTrackInvitationClient) Recv() (*TrackInvitationResponse, err
 // All implementations must embed UnimplementedTestServiceServer
 // for forward compatibility
 type TestServiceServer interface {
+	ListInvitations(context.Context, *ListInvitationsRequest) (*ListInvitationsResponse, error)
 	SendInvitation(context.Context, *SendInvitationRequest) (*SendInvitationResponse, error)
 	TrackInvitation(*TrackInvitationRequest, TestService_TrackInvitationServer) error
 	mustEmbedUnimplementedTestServiceServer()
@@ -84,6 +95,9 @@ type TestServiceServer interface {
 type UnimplementedTestServiceServer struct {
 }
 
+func (UnimplementedTestServiceServer) ListInvitations(context.Context, *ListInvitationsRequest) (*ListInvitationsResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ListInvitations not implemented")
+}
 func (UnimplementedTestServiceServer) SendInvitation(context.Context, *SendInvitationRequest) (*SendInvitationResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method SendInvitation not implemented")
 }
@@ -101,6 +115,24 @@ type UnsafeTestServiceServer interface {
 
 func RegisterTestServiceServer(s grpc.ServiceRegistrar, srv TestServiceServer) {
 	s.RegisterService(&TestService_ServiceDesc, srv)
+}
+
+func _TestService_ListInvitations_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListInvitationsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(TestServiceServer).ListInvitations(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/io.akuity.test.v1.TestService/ListInvitations",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(TestServiceServer).ListInvitations(ctx, req.(*ListInvitationsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
 }
 
 func _TestService_SendInvitation_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
@@ -149,6 +181,10 @@ var TestService_ServiceDesc = grpc.ServiceDesc{
 	ServiceName: "io.akuity.test.v1.TestService",
 	HandlerType: (*TestServiceServer)(nil),
 	Methods: []grpc.MethodDesc{
+		{
+			MethodName: "ListInvitations",
+			Handler:    _TestService_ListInvitations_Handler,
+		},
 		{
 			MethodName: "SendInvitation",
 			Handler:    _TestService_SendInvitation_Handler,

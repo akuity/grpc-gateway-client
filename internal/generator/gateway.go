@@ -13,7 +13,10 @@ import (
 )
 
 const (
+	loopKeyAccessor   = "k"
 	loopValueAccessor = "v"
+
+	mapKeyVarName = "key"
 )
 
 func getClientInterfaceName(svc *protogen.Service) string {
@@ -97,9 +100,11 @@ func generateQueryParam(
 	g *protogen.GeneratedFile,
 	field *protogen.Field,
 	structFields []string,
+	isMapKeyDefined bool,
 	queryKeyFields ...string,
 ) {
 	isOptional := field.Desc.HasOptionalKeyword()
+	isMap := field.Desc.IsMap()
 	isRepeated := field.Desc.Cardinality() == protoreflect.Repeated
 
 	queryKeyName := newStructAccessor(queryKeyFields, field.Desc.JSONName())
@@ -111,28 +116,38 @@ func generateQueryParam(
 		queryValueAccessor = newStructAccessor(structFields[:1], field.GoName)
 	}
 
-	if isRepeated {
-		g.P("for _, ", loopValueAccessor, " := range ", queryValueAccessor, " {")
+	if isMap {
+		g.P("for ", loopKeyAccessor, ", ", loopValueAccessor, " := range ", queryValueAccessor, " {")
+		g.P(mapKeyVarName, " := ", pkgFmt.Ident("Sprintf"), `("`, queryKeyName, `[%v]", `, loopKeyAccessor, ")")
+		queryKeyName = mapKeyVarName
 		queryValueAccessor = loopValueAccessor
 		structFields = []string{loopValueAccessor}
 		defer g.P("}")
-	} else if isOptional {
-		g.P("if ", queryValueAccessor, " != nil {")
-		defer g.P("}")
+	} else {
+		queryKeyName = fmt.Sprintf("%q", queryKeyName)
+		if isRepeated {
+			g.P("for _, ", loopValueAccessor, " := range ", queryValueAccessor, " {")
+			queryValueAccessor = loopValueAccessor
+			structFields = []string{loopValueAccessor}
+			defer g.P("}")
+		} else if isOptional {
+			g.P("if ", queryValueAccessor, " != nil {")
+			defer g.P("}")
+		}
 	}
 
 	switch {
-	case field.Desc.Message() != nil:
+	case !isMap && field.Desc.Message() != nil:
 		for _, f := range field.Message.Fields {
-			generateQueryParam(g, f, append(structFields, field.GoName), append(queryKeyFields, field.Desc.JSONName())...)
+			generateQueryParam(g, f, append(structFields, field.GoName), isMapKeyDefined, append(queryKeyFields, field.Desc.JSONName())...)
 		}
 		return
 	case field.Desc.Enum() != nil:
-		g.P(`q.Add("`, queryKeyName, `", `, queryValueAccessor, ".String())")
+		g.P(`q.Add(`, queryKeyName, `, `, queryValueAccessor, ".String())")
 	case isOptional:
-		g.P(`q.Add("`, queryKeyName, `", `, pkgFmt.Ident("Sprintf"), `("%v", *`, queryValueAccessor, "))")
+		g.P(`q.Add(`, queryKeyName, `, `, pkgFmt.Ident("Sprintf"), `("%v", *`, queryValueAccessor, "))")
 	default:
-		g.P(`q.Add("`, queryKeyName, `", `, pkgFmt.Ident("Sprintf"), `("%v", `, queryValueAccessor, "))")
+		g.P(`q.Add(`, queryKeyName, `, `, pkgFmt.Ident("Sprintf"), `("%v", `, queryValueAccessor, "))")
 	}
 }
 
@@ -169,7 +184,7 @@ func generateParamValues(g *protogen.GeneratedFile, m *protogen.Method) {
 					g.P("q := ", pkgNetURL.Ident("Values"), "{}")
 					isQueryDefined = true
 				}
-				generateQueryParam(g, field, []string{"req"})
+				generateQueryParam(g, field, []string{"req"}, false)
 			}
 		}
 		if isQueryDefined {

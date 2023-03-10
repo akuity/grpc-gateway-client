@@ -12,6 +12,7 @@ import (
 
 // TestServiceGatewayClient is the interface for TestService service client.
 type TestServiceGatewayClient interface {
+	ListInvitations(context.Context, *ListInvitationsRequest) (*ListInvitationsResponse, error)
 	SendInvitation(context.Context, *SendInvitationRequest) (*SendInvitationResponse, error)
 	TrackInvitation(context.Context, *TrackInvitationRequest) (<-chan *TrackInvitationResponse, <-chan error, error)
 }
@@ -24,6 +25,17 @@ func NewTestServiceGatewayClient(c gateway.Client) TestServiceGatewayClient {
 
 type testServiceGatewayClient struct {
 	gwc gateway.Client
+}
+
+func (c *testServiceGatewayClient) ListInvitations(ctx context.Context, req *ListInvitationsRequest) (*ListInvitationsResponse, error) {
+	gwReq := c.gwc.NewRequest("GET", "/invitations")
+	q := url.Values{}
+	for k, v := range req.Query.Labels {
+		key := fmt.Sprintf("query.labels[%v]", k)
+		q.Add(key, fmt.Sprintf("%v", v))
+	}
+	gwReq.SetQueryParamsFromValues(q)
+	return gateway.DoRequest[ListInvitationsResponse](ctx, gwReq)
 }
 
 func (c *testServiceGatewayClient) SendInvitation(ctx context.Context, req *SendInvitationRequest) (*SendInvitationResponse, error) {

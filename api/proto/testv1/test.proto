@@ -5,6 +5,11 @@ package io.akuity.test.v1;
 import "google/api/annotations.proto";
 
 service TestService {
+  rpc ListInvitations(ListInvitationsRequest) returns (ListInvitationsResponse) {
+    option (google.api.http) = {
+      get: "/invitations"
+    };
+  }
   rpc SendInvitation(SendInvitationRequest) returns (SendInvitationResponse) {
     option (google.api.http) = {
       post: "/invitation"
@@ -16,6 +21,27 @@ service TestService {
       get: "/invitation/{id}"
     };
   }
+}
+
+message InvitationMetadata {
+  map<string, string> raw = 1;
+}
+
+message Invitation {
+  string id = 1;
+  map<string, string> labels = 2;
+}
+
+message ListInvitationsQuery {
+  map<string, string> labels = 1;
+}
+
+message ListInvitationsRequest {
+  ListInvitationsQuery query = 1;
+}
+
+message ListInvitationsResponse {
+  repeated Invitation invitations = 1;
 }
 
 message SendInvitationRequest {

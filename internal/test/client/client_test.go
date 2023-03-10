@@ -88,6 +88,23 @@ func (s *ClientTestSuite) TestTrackInvitation() {
 	}
 }
 
+func (s *ClientTestSuite) TestListInvitations() {
+	req := &testv1.ListInvitationsRequest{
+		Query: &testv1.ListInvitationsQuery{
+			Labels: map[string]string{
+				"abc": "def",
+				"xyz": "123",
+			},
+		},
+	}
+	res, err := s.client.ListInvitations(context.TODO(), req)
+	s.Require().NoError(err)
+	s.Require().Len(res.GetInvitations(), 1)
+	actual := res.GetInvitations()[0]
+	s.Require().NotEmpty(actual.GetId())
+	s.Require().Equal(req.GetQuery().GetLabels(), actual.GetLabels())
+}
+
 func (s *ClientTestSuite) TearDownTest() {
 	s.gwSrv.Close()
 	s.grpcSrv.Stop()
