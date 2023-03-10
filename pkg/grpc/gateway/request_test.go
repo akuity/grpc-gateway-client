@@ -1,4 +1,4 @@
-package gateway
+package gateway_test
 
 import (
 	"context"
@@ -14,28 +14,10 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/test/bufconn"
 
-	"github.com/akuity/grpc-gateway-client/test/gen/healthv1"
+	"github.com/akuity/grpc-gateway-client/internal/test/gen/testv1"
+	"github.com/akuity/grpc-gateway-client/internal/test/server"
+	"github.com/akuity/grpc-gateway-client/pkg/grpc/gateway"
 )
-
-type healthServer struct {
-	healthv1.UnimplementedHealthServer
-}
-
-func (s *healthServer) Check(_ context.Context, _ *healthv1.HealthCheckRequest) (*healthv1.HealthCheckResponse, error) {
-	return &healthv1.HealthCheckResponse{Status: healthv1.HealthCheckResponse_SERVING}, nil
-}
-
-func (s *healthServer) Watch(_ *healthv1.HealthCheckRequest, srv healthv1.Health_WatchServer) error {
-	t := time.NewTicker(10 * time.Millisecond)
-	for {
-		select {
-		case <-t.C:
-			_ = srv.Send(&healthv1.HealthCheckResponse{Status: healthv1.HealthCheckResponse_SERVING})
-		case <-srv.Context().Done():
-			return nil
-		}
-	}
-}
 
 type RequestTestSuite struct {
 	suite.Suite
@@ -43,13 +25,13 @@ type RequestTestSuite struct {
 	l       *bufconn.Listener
 	grpcSrv *grpc.Server
 	gwSrv   *httptest.Server
-	client  Client
+	client  gateway.Client
 }
 
 func (s *RequestTestSuite) SetupTest() {
 	s.l = bufconn.Listen(256 * 1024)
 	s.grpcSrv = grpc.NewServer()
-	healthv1.RegisterHealthServer(s.grpcSrv, &healthServer{})
+	testv1.RegisterTestServiceServer(s.grpcSrv, server.NewTestServer())
 	go func() {
 		_ = s.grpcSrv.Serve(s.l)
 	}()
@@ -63,36 +45,42 @@ func (s *RequestTestSuite) SetupTest() {
 	s.Require().NoError(err)
 
 	marshaller := &runtime.JSONPb{}
-	sseMarshaller := NewEventStreamMarshaller(marshaller)
+	sseMarshaller := gateway.NewEventStreamMarshaller(marshaller)
 	mux := runtime.NewServeMux(
 		runtime.WithMarshalerOption("application/json", marshaller),
 		runtime.WithMarshalerOption("text/event-stream", sseMarshaller),
 	)
-	s.Require().NoError(healthv1.RegisterHealthHandler(context.TODO(), mux, cc))
+	s.Require().NoError(testv1.RegisterTestServiceHandler(context.TODO(), mux, cc))
 	s.gwSrv = httptest.NewServer(mux)
-	s.client = NewClient(s.gwSrv.URL)
+	s.client = gateway.NewClient(s.gwSrv.URL)
 }
 
 func (s *RequestTestSuite) TestDoRequest() {
-	req := s.client.NewRequest(http.MethodGet, "/healthz")
-	res, err := DoRequest[healthv1.HealthCheckResponse](context.TODO(), req)
+	req := s.client.NewRequest(http.MethodPost, "/invitation").
+		SetBody(&testv1.SendInvitationRequest{
+			Email: "test@test.com",
+		})
+	res, err := gateway.DoRequest[testv1.SendInvitationResponse](context.TODO(), req)
 	s.Require().NoError(err)
-	s.Require().Equal(healthv1.HealthCheckResponse_SERVING, res.Status)
+	s.Require().NotEmpty(res.GetId())
 }
 
 func (s *RequestTestSuite) TestDoStreamingRequest() {
 	ctx, cancel := context.WithTimeout(context.TODO(), 300*time.Millisecond)
 	defer cancel()
 
-	req := s.client.NewRequest(http.MethodGet, "/healthz/watch")
-	resCh, _, err := DoStreamingRequest[healthv1.HealthCheckResponse](ctx, s.client, req)
+	req := s.client.NewRequest(http.MethodGet, "/invitation/some-id")
+	resCh, _, err := gateway.DoStreamingRequest[testv1.TrackInvitationResponse](ctx, s.client, req)
 	s.Require().NoError(err)
 	for {
 		select {
 		case <-ctx.Done():
 			return
-		case data := <-resCh:
-			s.Require().Equal(healthv1.HealthCheckResponse_SERVING, data.Status)
+		case data, ok := <-resCh:
+			if !ok {
+				return
+			}
+			s.Require().True(testv1.EventType_EVENT_TYPE_UNDEFINED != data.GetType())
 		}
 	}
 }

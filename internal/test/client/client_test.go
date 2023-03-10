@@ -14,33 +14,10 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/test/bufconn"
 
+	"github.com/akuity/grpc-gateway-client/internal/test/gen/testv1"
+	"github.com/akuity/grpc-gateway-client/internal/test/server"
 	"github.com/akuity/grpc-gateway-client/pkg/grpc/gateway"
-	"github.com/akuity/grpc-gateway-client/test/gen/testv1"
 )
-
-type testServer struct {
-	testv1.UnimplementedTestServiceServer
-}
-
-func (s *testServer) SendInvitation(_ context.Context, req *testv1.SendInvitationRequest) (*testv1.SendInvitationResponse, error) {
-	return &testv1.SendInvitationResponse{
-		Id: base64.StdEncoding.EncodeToString([]byte(req.Email)),
-	}, nil
-}
-
-func (s *testServer) TrackInvitation(_ *testv1.TrackInvitationRequest, srv testv1.TestService_TrackInvitationServer) error {
-	eventTypes := []testv1.EventType{
-		testv1.EventType_EVENT_TYPE_SEEN,
-		testv1.EventType_EVENT_TYPE_ACCEPTED,
-	}
-	for _, et := range eventTypes {
-		_ = srv.Send(&testv1.TrackInvitationResponse{
-			Type: et,
-		})
-		time.Sleep(100 * time.Millisecond)
-	}
-	return nil
-}
 
 type ClientTestSuite struct {
 	suite.Suite
@@ -54,7 +31,7 @@ type ClientTestSuite struct {
 func (s *ClientTestSuite) SetupTest() {
 	s.l = bufconn.Listen(256 * 1024)
 	s.grpcSrv = grpc.NewServer()
-	testv1.RegisterTestServiceServer(s.grpcSrv, &testServer{})
+	testv1.RegisterTestServiceServer(s.grpcSrv, server.NewTestServer())
 	go func() {
 		_ = s.grpcSrv.Serve(s.l)
 	}()

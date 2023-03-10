@@ -1,4 +1,4 @@
-package gateway
+package gateway_test
 
 import (
 	"bytes"
@@ -9,7 +9,8 @@ import (
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/proto"
 
-	"github.com/akuity/grpc-gateway-client/test/gen/healthv1"
+	"github.com/akuity/grpc-gateway-client/internal/test/gen/testv1"
+	"github.com/akuity/grpc-gateway-client/pkg/grpc/gateway"
 )
 
 func TestEventStreamMarshaller(t *testing.T) {
@@ -18,16 +19,18 @@ func TestEventStreamMarshaller(t *testing.T) {
 		expected proto.Message
 	}{
 		"message": {
-			input: &healthv1.HealthCheckResponse{
-				Status: healthv1.HealthCheckResponse_SERVING,
+			input: &testv1.SendInvitationResponse{
+				Id: "some-id",
 			},
-			expected: &healthv1.HealthCheckResponse{},
+			expected: &testv1.SendInvitationResponse{
+				Id: "some-id",
+			},
 		},
 	}
 	for name, ts := range testSets {
 		t.Run(name, func(t *testing.T) {
 			jm := &runtime.JSONPb{}
-			m := NewEventStreamMarshaller(jm)
+			m := gateway.NewEventStreamMarshaller(jm)
 			data, err := m.Marshal(ts.input)
 			require.NoError(t, err)
 
