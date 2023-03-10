@@ -14,8 +14,8 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/test/bufconn"
 
-	"github.com/akuity/go-akuity/pkg/grpc/gateway"
-	testv1 "github.com/akuity/grpc-gateway-client/test/gen/test/v1"
+	"github.com/akuity/grpc-gateway-client/pkg/grpc/gateway"
+	"github.com/akuity/grpc-gateway-client/test/gen/testv1"
 )
 
 type testServer struct {
