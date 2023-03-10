@@ -130,9 +130,9 @@ func generateQueryParam(
 	case field.Desc.Enum() != nil:
 		g.P(`q.Add("`, queryKeyName, `", `, queryValueAccessor, ".String())")
 	case isOptional:
-		g.P(`q.Add("`, queryKeyName, `", `, pkgFmt.Ident("Sprintf"), `("%v", *`, queryValueAccessor, ")")
+		g.P(`q.Add("`, queryKeyName, `", `, pkgFmt.Ident("Sprintf"), `("%v", *`, queryValueAccessor, "))")
 	default:
-		g.P(`q.Add("`, queryKeyName, `", `, pkgFmt.Ident("Sprintf"), `("%v", `, queryValueAccessor, ")")
+		g.P(`q.Add("`, queryKeyName, `", `, pkgFmt.Ident("Sprintf"), `("%v", `, queryValueAccessor, "))")
 	}
 }
 
