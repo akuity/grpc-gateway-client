@@ -15,7 +15,7 @@ import (
 	"google.golang.org/grpc/test/bufconn"
 
 	"github.com/akuity/go-akuity/pkg/grpc/gateway"
-	testv1 "github.com/akuity/protoc-gen-grpc-gateway-client/test/gen/test/v1"
+	testv1 "github.com/akuity/grpc-gateway-client/test/gen/test/v1"
 )
 
 type testServer struct {

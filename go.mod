@@ -1,4 +1,4 @@
-module github.com/akuity/protoc-gen-grpc-gateway-client
+module github.com/akuity/grpc-gateway-client
 
 go 1.20
 
