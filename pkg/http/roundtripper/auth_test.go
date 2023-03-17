@@ -23,6 +23,12 @@ func TestAuthorizationInjector(t *testing.T) {
 			},
 			expected: "Bearer token",
 		},
+		"context with empty credential": {
+			newContextFunc: func() context.Context {
+				return httpctx.SetAuthorizationHeader(context.TODO(), "", "")
+			},
+			expected: "", // empty string
+		},
 		"context without credential": {
 			newContextFunc: context.TODO,
 			expected:       "", // empty string

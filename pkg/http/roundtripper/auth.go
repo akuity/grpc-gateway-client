@@ -21,7 +21,7 @@ func (i *authorizationHeaderInjector) Unwrap() http.RoundTripper {
 func (i *authorizationHeaderInjector) RoundTrip(req *http.Request) (*http.Response, error) {
 	ctx := req.Context()
 	auth, ok := httpctx.GetAuthorizationHeader(ctx)
-	if !ok {
+	if !ok || len(auth) == 0 {
 		return i.rt.RoundTrip(req)
 	}
 
