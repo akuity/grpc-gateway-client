@@ -39,7 +39,7 @@ The `grpc-gateway-client` is a high quality REST client generator for [gRPC](htt
     if err != nil {
         panic(err)
     }
-    println(resp.Message)
+    fmt.Println(resp.Message)
     ```
 
 See [example](./example/README.md) for a complete example.
