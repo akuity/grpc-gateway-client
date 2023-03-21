@@ -33,6 +33,6 @@ resp, err := client.SayHello(context.Background(), &grpc_gateway_client_example.
 if err != nil {
     panic(err)
 }
-println(resp.Message)
+    fmt.Println(resp.Message)
 ```
 
