@@ -25,7 +25,7 @@ The `grpc-gateway-client` is a high quality REST client generator for [gRPC](htt
     enabled: true
 
     plugins:
-    - name: gateway-client
+      - name: gateway-client
         path: protoc-gen-grpc-gateway-client
         out: pkg/api/gen
         opt:
