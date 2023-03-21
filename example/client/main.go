@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"os"
 
 	"github.com/akuity/grpc-gateway-client/pkg/grpc/gateway"
@@ -19,5 +20,5 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	println(resp.Message)
+	fmt.Println(resp.Message)
 }
