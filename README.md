@@ -29,7 +29,7 @@ The `grpc-gateway-client` is a high quality REST client generator for [gRPC](htt
         path: protoc-gen-grpc-gateway-client
         out: pkg/api/gen
         opt:
-        - paths=source_relative
+          - paths=source_relative
     ```
 1. Generate client using `buf generate` and use it in your code:
 
