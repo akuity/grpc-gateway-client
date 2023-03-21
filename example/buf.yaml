@@ -1,0 +1,5 @@
+version: v1
+name: buf.build/akuityio/akuity-platform
+deps:
+  - buf.build/googleapis/googleapis
+  - buf.build/grpc-ecosystem/grpc-gateway
