@@ -7,6 +7,7 @@ import (
 	context "context"
 	fmt "fmt"
 	gateway "github.com/akuity/grpc-gateway-client/pkg/grpc/gateway"
+	httpbody "google.golang.org/genproto/googleapis/api/httpbody"
 	url "net/url"
 )
 
@@ -15,6 +16,7 @@ type TestServiceGatewayClient interface {
 	ListInvitations(context.Context, *ListInvitationsRequest) (*ListInvitationsResponse, error)
 	SendInvitation(context.Context, *SendInvitationRequest) (*SendInvitationResponse, error)
 	TrackInvitation(context.Context, *TrackInvitationRequest) (<-chan *TrackInvitationResponse, <-chan error, error)
+	DownloadInvitations(context.Context, *DownloadInvitationRequest) (<-chan *httpbody.HttpBody, <-chan error, error)
 }
 
 func NewTestServiceGatewayClient(c gateway.Client) TestServiceGatewayClient {
@@ -53,4 +55,9 @@ func (c *testServiceGatewayClient) TrackInvitation(ctx context.Context, req *Tra
 	}
 	gwReq.SetQueryParamsFromValues(q)
 	return gateway.DoStreamingRequest[TrackInvitationResponse](ctx, c.gwc, gwReq)
+}
+
+func (c *testServiceGatewayClient) DownloadInvitations(ctx context.Context, req *DownloadInvitationRequest) (<-chan *httpbody.HttpBody, <-chan error, error) {
+	gwReq := c.gwc.NewRequest("GET", "/download-invitations")
+	return gateway.DoStreamingRequest[httpbody.HttpBody](ctx, c.gwc, gwReq)
 }

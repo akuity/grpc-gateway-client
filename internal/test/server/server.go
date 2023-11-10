@@ -1,11 +1,14 @@
 package server
 
 import (
+	"bytes"
 	"context"
 	"encoding/base64"
 	"time"
 
 	"github.com/akuity/grpc-gateway-client/internal/test/gen/testv1"
+	"github.com/bufbuild/protoyaml-go"
+	"google.golang.org/genproto/googleapis/api/httpbody"
 )
 
 type testServiceServer struct {
@@ -41,6 +44,32 @@ func (s *testServiceServer) TrackInvitation(_ *testv1.TrackInvitationRequest, sr
 	for _, et := range eventTypes {
 		_ = srv.Send(&testv1.TrackInvitationResponse{
 			Type: et,
+		})
+		time.Sleep(100 * time.Millisecond)
+	}
+	return nil
+}
+
+func (s *testServiceServer) DownloadInvitations(_ *testv1.DownloadInvitationRequest, srv testv1.TestService_DownloadInvitationsServer) error {
+	invitations := []*testv1.Invitation{
+		{
+			Id: "test-1",
+		},
+		{
+			Id: "test-2",
+		},
+	}
+	for _, invitation := range invitations {
+		var buf bytes.Buffer
+		data, err := protoyaml.Marshal(invitation)
+		if err != nil {
+			return err
+		}
+		_, _ = buf.WriteString("---\n")
+		_, _ = buf.Write(data)
+		_ = srv.Send(&httpbody.HttpBody{
+			ContentType: "application/yaml",
+			Data:        buf.Bytes(),
 		})
 		time.Sleep(100 * time.Millisecond)
 	}

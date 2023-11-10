@@ -1,6 +1,8 @@
 package gateway
 
 import (
+	"bufio"
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -58,6 +60,15 @@ func DoRequest[T any](ctx context.Context, req *resty.Request) (*T, error) {
 }
 
 func DoStreamingRequest[T any](ctx context.Context, c Client, req *resty.Request) (<-chan *T, <-chan error, error) {
+	var resBody T
+	if _, ok := any(&resBody).(*httpbody.HttpBody); ok {
+		resCh, errCh, err := doHTTPStreamingRequest(ctx, req)
+		if err != nil {
+			return nil, nil, err
+		}
+		return resCh.(chan *T), errCh, nil
+	}
+
 	rawRes, err := req.SetContext(ctx).
 		SetHeader("Accept", "text/event-stream").
 		SetHeader("Cache-Control", "no-cache").
@@ -83,11 +94,11 @@ func DoStreamingRequest[T any](ctx context.Context, c Client, req *resty.Request
 		if !ok {
 			return nil, nil, errors.New(string(data))
 		}
-		var errRes rpcstatus.Status
-		if err := c.Unmarshal(rawErrRes, &errRes); err != nil {
+		var errResp rpcstatus.Status
+		if err := c.Unmarshal(rawErrRes, &errResp); err != nil {
 			return nil, nil, fmt.Errorf("unmarshal error response: %w", err)
 		}
-		if err := status.ErrorProto(&errRes); err != nil {
+		if err := status.ErrorProto(&errResp); err != nil {
 			return nil, nil, err
 		}
 		return nil, nil, status.Error(HTTPStatusToCode(rawRes.StatusCode()), rawRes.String())
@@ -132,7 +143,7 @@ func DoStreamingRequest[T any](ctx context.Context, c Client, req *resty.Request
 	return resCh, errCh, nil
 }
 
-func doHTTPRequest(ctx context.Context, req *resty.Request) (interface{}, error) {
+func doHTTPRequest(ctx context.Context, req *resty.Request) (any, error) {
 	res, err := req.SetContext(ctx).
 		SetError(&rpcstatus.Status{}).
 		Send()
@@ -153,4 +164,58 @@ func doHTTPRequest(ctx context.Context, req *resty.Request) (interface{}, error)
 		ContentType: res.Header().Get("Content-Type"),
 		Data:        res.Body(),
 	}, nil
+}
+
+func doHTTPStreamingRequest(ctx context.Context, req *resty.Request) (any, <-chan error, error) {
+	res, err := req.SetContext(ctx).
+		SetDoNotParseResponse(true).
+		Send()
+	if err != nil {
+		return nil, nil, fmt.Errorf("send request: %w", err)
+	}
+	if res.IsError() {
+		errResp, ok := res.Error().(*rpcstatus.Status)
+		if !ok {
+			return nil, nil, fmt.Errorf("cast error response: %s", res.String())
+		}
+		if err := status.ErrorProto(errResp); err != nil {
+			return nil, nil, err
+		}
+		return nil, nil, status.Error(HTTPStatusToCode(res.StatusCode()), errResp.String())
+	}
+
+	resCh := make(chan *httpbody.HttpBody)
+	errCh := make(chan error)
+	go func() {
+		contentType := res.Header().Get("Content-Type")
+		body := res.RawBody()
+		defer func() { _ = body.Close() }()
+		r := bufio.NewReader(body)
+		for {
+			var data bytes.Buffer
+			for {
+				line, isPrefix, err := r.ReadLine()
+				if err != nil {
+					if errors.Is(err, io.EOF) {
+						close(resCh)
+						return
+					}
+					errCh <- fmt.Errorf("read line: %w", err)
+					return
+				}
+				if _, err := data.Write(append(line, '\n')); err != nil {
+					errCh <- fmt.Errorf("write line: %w", err)
+					return
+				}
+				if !isPrefix {
+					break
+				}
+			}
+			resCh <- &httpbody.HttpBody{
+				ContentType: contentType,
+				Data:        data.Bytes(),
+			}
+		}
+	}()
+	return resCh, errCh, nil
 }
