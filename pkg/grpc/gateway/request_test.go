@@ -10,9 +10,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/akuity/grpc-gateway-client/internal/test/gen/testv1"
-	"github.com/akuity/grpc-gateway-client/internal/test/server"
-	"github.com/akuity/grpc-gateway-client/pkg/grpc/gateway"
 	"github.com/bufbuild/protoyaml-go"
 	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
 	"github.com/stretchr/testify/suite"
@@ -21,6 +18,10 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/test/bufconn"
 	"google.golang.org/protobuf/proto"
+
+	"github.com/akuity/grpc-gateway-client/internal/test/gen/testv1"
+	"github.com/akuity/grpc-gateway-client/internal/test/server"
+	"github.com/akuity/grpc-gateway-client/pkg/grpc/gateway"
 )
 
 type RequestTestSuite struct {
