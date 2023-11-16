@@ -1,18 +1,25 @@
 package gateway_test
 
 import (
+	"bytes"
 	"context"
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
+	"github.com/bufbuild/protoyaml-go"
 	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
 	"github.com/stretchr/testify/suite"
+	"google.golang.org/genproto/googleapis/api/httpbody"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/status"
 	"google.golang.org/grpc/test/bufconn"
+	"google.golang.org/protobuf/proto"
 
 	"github.com/akuity/grpc-gateway-client/internal/test/gen/testv1"
 	"github.com/akuity/grpc-gateway-client/internal/test/server"
@@ -83,6 +90,69 @@ func (s *RequestTestSuite) TestDoStreamingRequest() {
 			s.Require().True(testv1.EventType_EVENT_TYPE_UNDEFINED != data.GetType())
 		}
 	}
+}
+
+func (s *RequestTestSuite) TestDownloadRequest() {
+	ctx, cancel := context.WithTimeout(context.TODO(), 500*time.Millisecond)
+	defer cancel()
+	req := s.client.NewRequest(http.MethodGet, "/download-invitations")
+	resCh, errCh, err := gateway.DoStreamingRequest[httpbody.HttpBody](ctx, s.client, req)
+	s.Require().NoError(err)
+	var buf bytes.Buffer
+
+read:
+	for {
+		select {
+		case <-ctx.Done():
+			break read
+		case err := <-errCh:
+			s.Require().NoError(err)
+		case data, ok := <-resCh:
+			if !ok {
+				break read
+			}
+			buf.Write(data.GetData())
+		}
+	}
+
+	var actual []*testv1.Invitation
+	docs := strings.Split(buf.String(), "---\n")
+	for _, doc := range docs {
+		data := strings.TrimSpace(doc)
+		if data == "" {
+			continue
+		}
+
+		invitation := &testv1.Invitation{}
+		s.Require().NoError(protoyaml.Unmarshal([]byte(data), invitation))
+		actual = append(actual, invitation)
+	}
+	expected := []*testv1.Invitation{
+		{
+			Id: "test-1",
+		},
+		{
+			Id: "test-2",
+		},
+	}
+	s.Require().Len(actual, len(expected))
+	for idx := range actual {
+		s.Require().True(proto.Equal(expected[idx], actual[idx]))
+	}
+}
+
+func (s *RequestTestSuite) TestDownloadRequest_Error() {
+	ctx, cancel := context.WithTimeout(context.TODO(), 500*time.Millisecond)
+	defer cancel()
+	req := s.client.NewRequest(http.MethodGet, "/download-invitations").
+		SetQueryParams(map[string]string{
+			"type": "EVENT_TYPE_UNKNOWN",
+		})
+	_, _, err := gateway.DoStreamingRequest[httpbody.HttpBody](ctx, s.client, req)
+	s.Require().Error(err)
+	stat, ok := status.FromError(err)
+	s.Require().True(ok)
+	s.Require().Equal(codes.InvalidArgument, stat.Code())
 }
 
 func (s *RequestTestSuite) TearDownTest() {
