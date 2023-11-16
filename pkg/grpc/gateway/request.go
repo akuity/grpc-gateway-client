@@ -14,6 +14,7 @@ import (
 	"google.golang.org/genproto/googleapis/api/httpbody"
 	rpcstatus "google.golang.org/genproto/googleapis/rpc/status"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/encoding/protojson"
 )
 
 type streamingResponse map[string]json.RawMessage
@@ -146,7 +147,6 @@ func doHTTPRequest(ctx context.Context, req *resty.Request) (any, error) {
 
 func doHTTPStreamingRequest(ctx context.Context, c Client, req *resty.Request) (any, <-chan error, error) {
 	res, err := req.SetContext(ctx).
-		SetHeader("Accept", "text/event-stream").
 		SetHeader("Cache-Control", "no-cache").
 		SetHeader("Connection", "keep-alive").
 		SetDoNotParseResponse(true).
@@ -208,7 +208,11 @@ func wrapStreamingResponseError(c Client, resp *resty.Response) error {
 	}
 	rawErrRes, ok := streamingResp[streamingResponseErrorKey]
 	if !ok {
-		return errors.New(string(data))
+		var statusResp rpcstatus.Status
+		if err := protojson.Unmarshal(data, &statusResp); err != nil {
+			return errors.New(string(data))
+		}
+		return status.FromProto(&statusResp).Err()
 	}
 	var errResp rpcstatus.Status
 	if err := c.Unmarshal(rawErrRes, &errResp); err != nil {

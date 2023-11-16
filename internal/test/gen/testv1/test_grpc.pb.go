@@ -33,7 +33,7 @@ type TestServiceClient interface {
 	ListInvitations(ctx context.Context, in *ListInvitationsRequest, opts ...grpc.CallOption) (*ListInvitationsResponse, error)
 	SendInvitation(ctx context.Context, in *SendInvitationRequest, opts ...grpc.CallOption) (*SendInvitationResponse, error)
 	TrackInvitation(ctx context.Context, in *TrackInvitationRequest, opts ...grpc.CallOption) (TestService_TrackInvitationClient, error)
-	DownloadInvitations(ctx context.Context, in *DownloadInvitationRequest, opts ...grpc.CallOption) (TestService_DownloadInvitationsClient, error)
+	DownloadInvitations(ctx context.Context, in *DownloadInvitationsRequest, opts ...grpc.CallOption) (TestService_DownloadInvitationsClient, error)
 }
 
 type testServiceClient struct {
@@ -94,7 +94,7 @@ func (x *testServiceTrackInvitationClient) Recv() (*TrackInvitationResponse, err
 	return m, nil
 }
 
-func (c *testServiceClient) DownloadInvitations(ctx context.Context, in *DownloadInvitationRequest, opts ...grpc.CallOption) (TestService_DownloadInvitationsClient, error) {
+func (c *testServiceClient) DownloadInvitations(ctx context.Context, in *DownloadInvitationsRequest, opts ...grpc.CallOption) (TestService_DownloadInvitationsClient, error) {
 	stream, err := c.cc.NewStream(ctx, &TestService_ServiceDesc.Streams[1], TestService_DownloadInvitations_FullMethodName, opts...)
 	if err != nil {
 		return nil, err
@@ -133,7 +133,7 @@ type TestServiceServer interface {
 	ListInvitations(context.Context, *ListInvitationsRequest) (*ListInvitationsResponse, error)
 	SendInvitation(context.Context, *SendInvitationRequest) (*SendInvitationResponse, error)
 	TrackInvitation(*TrackInvitationRequest, TestService_TrackInvitationServer) error
-	DownloadInvitations(*DownloadInvitationRequest, TestService_DownloadInvitationsServer) error
+	DownloadInvitations(*DownloadInvitationsRequest, TestService_DownloadInvitationsServer) error
 	mustEmbedUnimplementedTestServiceServer()
 }
 
@@ -150,7 +150,7 @@ func (UnimplementedTestServiceServer) SendInvitation(context.Context, *SendInvit
 func (UnimplementedTestServiceServer) TrackInvitation(*TrackInvitationRequest, TestService_TrackInvitationServer) error {
 	return status.Errorf(codes.Unimplemented, "method TrackInvitation not implemented")
 }
-func (UnimplementedTestServiceServer) DownloadInvitations(*DownloadInvitationRequest, TestService_DownloadInvitationsServer) error {
+func (UnimplementedTestServiceServer) DownloadInvitations(*DownloadInvitationsRequest, TestService_DownloadInvitationsServer) error {
 	return status.Errorf(codes.Unimplemented, "method DownloadInvitations not implemented")
 }
 func (UnimplementedTestServiceServer) mustEmbedUnimplementedTestServiceServer() {}
@@ -224,7 +224,7 @@ func (x *testServiceTrackInvitationServer) Send(m *TrackInvitationResponse) erro
 }
 
 func _TestService_DownloadInvitations_Handler(srv interface{}, stream grpc.ServerStream) error {
-	m := new(DownloadInvitationRequest)
+	m := new(DownloadInvitationsRequest)
 	if err := stream.RecvMsg(m); err != nil {
 		return err
 	}

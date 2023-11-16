@@ -51,7 +51,7 @@ func (s *testServiceServer) TrackInvitation(_ *testv1.TrackInvitationRequest, sr
 	return nil
 }
 
-func (s *testServiceServer) DownloadInvitations(_ *testv1.DownloadInvitationRequest, srv testv1.TestService_DownloadInvitationsServer) error {
+func (s *testServiceServer) DownloadInvitations(req *testv1.DownloadInvitationsRequest, srv testv1.TestService_DownloadInvitationsServer) error {
 	invitations := []*testv1.Invitation{
 		{
 			Id: "test-1",

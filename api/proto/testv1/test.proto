@@ -22,7 +22,7 @@ service TestService {
       get: "/invitation/{id}"
     };
   }
-  rpc DownloadInvitations(DownloadInvitationRequest) returns (stream google.api.HttpBody) {
+  rpc DownloadInvitations(DownloadInvitationsRequest) returns (stream google.api.HttpBody) {
     option (google.api.http) = {
       get: "/download-invitations"
     };
@@ -75,6 +75,6 @@ message TrackInvitationResponse {
   string message = 2;
 }
 
-message DownloadInvitationRequest {
-  /* explicitly empty */
+message DownloadInvitationsRequest {
+  optional EventType type = 1;
 }

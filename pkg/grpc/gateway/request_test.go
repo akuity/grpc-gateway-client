@@ -15,7 +15,9 @@ import (
 	"github.com/stretchr/testify/suite"
 	"google.golang.org/genproto/googleapis/api/httpbody"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/status"
 	"google.golang.org/grpc/test/bufconn"
 	"google.golang.org/protobuf/proto"
 
@@ -137,6 +139,20 @@ read:
 	for idx := range actual {
 		s.Require().True(proto.Equal(expected[idx], actual[idx]))
 	}
+}
+
+func (s *RequestTestSuite) TestDownloadRequest_Error() {
+	ctx, cancel := context.WithTimeout(context.TODO(), 500*time.Millisecond)
+	defer cancel()
+	req := s.client.NewRequest(http.MethodGet, "/download-invitations").
+		SetQueryParams(map[string]string{
+			"type": "EVENT_TYPE_UNKNOWN",
+		})
+	_, _, err := gateway.DoStreamingRequest[httpbody.HttpBody](ctx, s.client, req)
+	s.Require().Error(err)
+	stat, ok := status.FromError(err)
+	s.Require().True(ok)
+	s.Require().Equal(codes.InvalidArgument, stat.Code())
 }
 
 func (s *RequestTestSuite) TearDownTest() {

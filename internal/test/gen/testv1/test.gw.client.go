@@ -16,7 +16,7 @@ type TestServiceGatewayClient interface {
 	ListInvitations(context.Context, *ListInvitationsRequest) (*ListInvitationsResponse, error)
 	SendInvitation(context.Context, *SendInvitationRequest) (*SendInvitationResponse, error)
 	TrackInvitation(context.Context, *TrackInvitationRequest) (<-chan *TrackInvitationResponse, <-chan error, error)
-	DownloadInvitations(context.Context, *DownloadInvitationRequest) (<-chan *httpbody.HttpBody, <-chan error, error)
+	DownloadInvitations(context.Context, *DownloadInvitationsRequest) (<-chan *httpbody.HttpBody, <-chan error, error)
 }
 
 func NewTestServiceGatewayClient(c gateway.Client) TestServiceGatewayClient {
@@ -57,7 +57,12 @@ func (c *testServiceGatewayClient) TrackInvitation(ctx context.Context, req *Tra
 	return gateway.DoStreamingRequest[TrackInvitationResponse](ctx, c.gwc, gwReq)
 }
 
-func (c *testServiceGatewayClient) DownloadInvitations(ctx context.Context, req *DownloadInvitationRequest) (<-chan *httpbody.HttpBody, <-chan error, error) {
+func (c *testServiceGatewayClient) DownloadInvitations(ctx context.Context, req *DownloadInvitationsRequest) (<-chan *httpbody.HttpBody, <-chan error, error) {
 	gwReq := c.gwc.NewRequest("GET", "/download-invitations")
+	q := url.Values{}
+	if req.Type != nil {
+		q.Add("type", req.Type.String())
+	}
+	gwReq.SetQueryParamsFromValues(q)
 	return gateway.DoStreamingRequest[httpbody.HttpBody](ctx, c.gwc, gwReq)
 }

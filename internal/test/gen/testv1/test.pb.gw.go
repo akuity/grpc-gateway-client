@@ -146,9 +146,20 @@ func request_TestService_TrackInvitation_0(ctx context.Context, marshaler runtim
 
 }
 
+var (
+	filter_TestService_DownloadInvitations_0 = &utilities.DoubleArray{Encoding: map[string]int{}, Base: []int(nil), Check: []int(nil)}
+)
+
 func request_TestService_DownloadInvitations_0(ctx context.Context, marshaler runtime.Marshaler, client TestServiceClient, req *http.Request, pathParams map[string]string) (TestService_DownloadInvitationsClient, runtime.ServerMetadata, error) {
-	var protoReq DownloadInvitationRequest
+	var protoReq DownloadInvitationsRequest
 	var metadata runtime.ServerMetadata
+
+	if err := req.ParseForm(); err != nil {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "%v", err)
+	}
+	if err := runtime.PopulateQueryParameters(&protoReq, req.Form, filter_TestService_DownloadInvitations_0); err != nil {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "%v", err)
+	}
 
 	stream, err := client.DownloadInvitations(ctx, &protoReq)
 	if err != nil {
