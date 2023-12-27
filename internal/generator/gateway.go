@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"google.golang.org/genproto/googleapis/api/annotations"
+	"google.golang.org/genproto/googleapis/api/visibility"
 	"google.golang.org/protobuf/compiler/protogen"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/reflect/protoreflect"
@@ -136,7 +137,16 @@ func generateQueryParam(
 		}
 	}
 
+	ext := proto.GetExtension(field.Desc.Options(), visibility.E_FieldVisibility)
+	opts, ok := ext.(*visibility.VisibilityRule)
+	if !ok {
+		opts = &visibility.VisibilityRule{}
+	}
+	restrictions := strings.Split(strings.TrimSpace(opts.Restriction), ",")
+
 	switch {
+	case len(restrictions) > 0:
+		return
 	case !isMap && field.Desc.Message() != nil:
 		for _, f := range field.Message.Fields {
 			generateQueryParam(g, f, append(structFields, field.GoName), isMapKeyDefined, append(queryKeyFields, field.Desc.JSONName())...)
