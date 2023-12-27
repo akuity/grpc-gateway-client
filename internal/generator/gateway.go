@@ -111,6 +111,10 @@ func generateQueryParam(
 	queryKeyName := newStructAccessor(queryKeyFields, field.Desc.JSONName())
 	queryValueAccessor := newStructAccessor(structFields, field.GoName)
 
+	if field.Oneof != nil {
+		queryValueAccessor = newStructAccessor(structFields, field.Oneof.GoName)
+	}
+
 	// If current field is inside the repeated message, ignore intermediate fields
 	// since the loopValueAccessor directs the current field itself.
 	if len(structFields) > 1 && structFields[0] == loopValueAccessor {
@@ -178,6 +182,9 @@ func generateParamValues(g *protogen.GeneratedFile, m *protogen.Method) {
 		if strings.Contains(rule.Pattern, fmt.Sprintf("{%s}", fieldName)) {
 			pathFields[fieldName] = true
 			valueAccessor := newStructAccessor([]string{"req"}, field.GoName)
+			if field.Oneof != nil {
+				valueAccessor = newStructAccessor([]string{"req"}, field.Oneof.GoName)
+			}
 			if field.Desc.Enum() != nil {
 				g.P(`gwReq.SetPathParam("`, fieldName, `", `, valueAccessor, ".String())")
 			} else {
