@@ -137,12 +137,13 @@ func generateQueryParam(
 		}
 	}
 
-	ext := proto.GetExtension(field.Desc.Options(), visibility.E_FieldVisibility)
-	opts, ok := ext.(*visibility.VisibilityRule)
-	if !ok {
-		opts = &visibility.VisibilityRule{}
+	var restrictions []string
+	if proto.HasExtension(field.Desc.Options(), visibility.E_FieldVisibility) {
+		ext := proto.GetExtension(field.Desc.Options(), visibility.E_FieldVisibility)
+		if opts, ok := ext.(*visibility.VisibilityRule); ok {
+			restrictions = strings.Split(strings.TrimSpace(opts.Restriction), ",")
+		}
 	}
-	restrictions := strings.Split(strings.TrimSpace(opts.Restriction), ",")
 
 	switch {
 	case len(restrictions) > 0:
