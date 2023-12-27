@@ -6,7 +6,7 @@ package testv1
 import (
 	context "context"
 	fmt "fmt"
-	gateway "github.com/akuity/grpc-gateway-client/pkg/grpc/gateway"
+	gateway "github.com/omrikiei/grpc-gateway-client/pkg/grpc/gateway"
 	httpbody "google.golang.org/genproto/googleapis/api/httpbody"
 	url "net/url"
 )
