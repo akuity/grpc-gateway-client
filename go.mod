@@ -1,8 +1,9 @@
-module github.com/akuity/grpc-gateway-client
+module github.com/omrikiei/grpc-gateway-client
 
 go 1.20
 
 require (
+	github.com/akuity/grpc-gateway-client v0.0.0-20231116134900-80c401329778
 	github.com/alevinval/sse v1.0.1
 	github.com/bufbuild/protoyaml-go v0.1.5
 	github.com/go-resty/resty/v2 v2.7.0
