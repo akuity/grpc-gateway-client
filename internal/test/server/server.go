@@ -9,7 +9,7 @@ import (
 	"github.com/bufbuild/protoyaml-go"
 	"google.golang.org/genproto/googleapis/api/httpbody"
 
-	"github.com/akuity/grpc-gateway-client/internal/test/gen/testv1"
+	"github.com/omrikiei/grpc-gateway-client/internal/test/gen/testv1"
 )
 
 type testServiceServer struct {

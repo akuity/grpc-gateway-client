@@ -3,7 +3,7 @@ package roundtripper
 import (
 	"net/http"
 
-	httpctx "github.com/akuity/grpc-gateway-client/pkg/http/context"
+	httpctx "github.com/omrikiei/grpc-gateway-client/pkg/http/context"
 )
 
 var (

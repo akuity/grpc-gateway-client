@@ -5,7 +5,7 @@ import (
 
 	"google.golang.org/protobuf/compiler/protogen"
 
-	"github.com/akuity/grpc-gateway-client/internal/generator"
+	"github.com/omrikiei/grpc-gateway-client/internal/generator"
 )
 
 func main() {

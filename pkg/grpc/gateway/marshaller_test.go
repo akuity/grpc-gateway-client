@@ -9,8 +9,8 @@ import (
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/proto"
 
-	"github.com/akuity/grpc-gateway-client/internal/test/gen/testv1"
 	"github.com/akuity/grpc-gateway-client/pkg/grpc/gateway"
+	"github.com/omrikiei/grpc-gateway-client/internal/test/gen/testv1"
 )
 
 func TestEventStreamMarshaller(t *testing.T) {

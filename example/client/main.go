@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/akuity/grpc-gateway-client/pkg/grpc/gateway"
+	"github.com/omrikiei/grpc-gateway-client/pkg/grpc/gateway"
 
 	grpc_gateway_client_example "github.com/akuity/grpc-gateway-client-example/pkg/api/gen"
 )

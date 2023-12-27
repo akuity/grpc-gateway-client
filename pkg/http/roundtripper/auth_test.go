@@ -9,7 +9,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	httpctx "github.com/akuity/grpc-gateway-client/pkg/http/context"
+	httpctx "github.com/omrikiei/grpc-gateway-client/pkg/http/context"
 )
 
 func TestAuthorizationInjector(t *testing.T) {
