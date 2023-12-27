@@ -115,6 +115,18 @@ func generateQueryParam(
 		queryValueAccessor = newStructAccessor(structFields, field.Oneof.GoName)
 	}
 
+	var restrictions []string
+	if proto.HasExtension(field.Desc.Options(), visibility.E_FieldVisibility) {
+		ext := proto.GetExtension(field.Desc.Options(), visibility.E_FieldVisibility)
+		if opts, ok := ext.(*visibility.VisibilityRule); ok {
+			restrictions = strings.Split(strings.TrimSpace(opts.Restriction), ",")
+		}
+	}
+
+	if len(restrictions) > 0 {
+		return
+	}
+
 	// If current field is inside the repeated message, ignore intermediate fields
 	// since the loopValueAccessor directs the current field itself.
 	if len(structFields) > 1 && structFields[0] == loopValueAccessor {
@@ -141,17 +153,7 @@ func generateQueryParam(
 		}
 	}
 
-	var restrictions []string
-	if proto.HasExtension(field.Desc.Options(), visibility.E_FieldVisibility) {
-		ext := proto.GetExtension(field.Desc.Options(), visibility.E_FieldVisibility)
-		if opts, ok := ext.(*visibility.VisibilityRule); ok {
-			restrictions = strings.Split(strings.TrimSpace(opts.Restriction), ",")
-		}
-	}
-
 	switch {
-	case len(restrictions) > 0:
-		return
 	case !isMap && field.Desc.Message() != nil:
 		for _, f := range field.Message.Fields {
 			generateQueryParam(g, f, append(structFields, field.GoName), isMapKeyDefined, append(queryKeyFields, field.Desc.JSONName())...)
