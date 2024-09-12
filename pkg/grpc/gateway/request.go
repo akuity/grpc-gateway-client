@@ -173,6 +173,7 @@ func doHTTPStreamingRequest(ctx context.Context, c Client, req *resty.Request) (
 			ContentType: contentType,
 			Data:        data.Bytes(),
 		}
+		close(resCh)
 	}()
 	return resCh, errCh, nil
 }

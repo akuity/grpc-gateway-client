@@ -168,6 +168,7 @@ read:
 		}
 	}
 
+	require.NoError(s.T(), ctx.Err())
 	require.Equal(s.T(), strings.TrimSpace(assets.LargeFile), strings.TrimSpace(buf.String()))
 }
 
