@@ -9,7 +9,10 @@ import (
 	"github.com/bufbuild/protoyaml-go"
 	"google.golang.org/genproto/googleapis/api/httpbody"
 
+	"github.com/akuity/grpc-gateway-client/internal/assets"
 	"github.com/akuity/grpc-gateway-client/internal/test/gen/testv1"
+
+	_ "embed"
 )
 
 type testServiceServer struct {
@@ -75,4 +78,14 @@ func (s *testServiceServer) DownloadInvitations(req *testv1.DownloadInvitationsR
 		time.Sleep(100 * time.Millisecond)
 	}
 	return nil
+}
+
+func (s *testServiceServer) DownloadLargeFile(
+	req *testv1.DownloadLargeFileRequest,
+	srv testv1.TestService_DownloadLargeFileServer,
+) error {
+	return srv.Send(&httpbody.HttpBody{
+		ContentType: "text/plain",
+		Data:        []byte(assets.LargeFile),
+	})
 }
