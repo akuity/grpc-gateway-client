@@ -1,18 +1,18 @@
 package server
 
 import (
-	_ "embed"
-
 	"bytes"
 	"context"
 	"encoding/base64"
 	"time"
 
-	"github.com/akuity/grpc-gateway-client/internal/assets"
 	"github.com/bufbuild/protoyaml-go"
 	"google.golang.org/genproto/googleapis/api/httpbody"
 
+	"github.com/akuity/grpc-gateway-client/internal/assets"
 	"github.com/akuity/grpc-gateway-client/internal/test/gen/testv1"
+
+	_ "embed"
 )
 
 type testServiceServer struct {
