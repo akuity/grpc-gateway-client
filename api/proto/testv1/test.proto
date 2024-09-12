@@ -27,6 +27,11 @@ service TestService {
       get: "/download-invitations"
     };
   }
+  rpc DownloadLargeFile(DownloadLargeFileRequest) returns (stream google.api.HttpBody) {
+    option (google.api.http) = {
+      get: "/download-large-file"
+    };
+  }
 }
 
 message InvitationMetadata {
@@ -77,4 +82,8 @@ message TrackInvitationResponse {
 
 message DownloadInvitationsRequest {
   optional EventType type = 1;
+}
+
+message DownloadLargeFileRequest {
+  // Explicitly empty
 }

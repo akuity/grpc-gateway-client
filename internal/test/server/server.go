@@ -1,11 +1,14 @@
 package server
 
 import (
+	_ "embed"
+
 	"bytes"
 	"context"
 	"encoding/base64"
 	"time"
 
+	"github.com/akuity/grpc-gateway-client/internal/assets"
 	"github.com/bufbuild/protoyaml-go"
 	"google.golang.org/genproto/googleapis/api/httpbody"
 
@@ -75,4 +78,14 @@ func (s *testServiceServer) DownloadInvitations(req *testv1.DownloadInvitationsR
 		time.Sleep(100 * time.Millisecond)
 	}
 	return nil
+}
+
+func (s *testServiceServer) DownloadLargeFile(
+	req *testv1.DownloadLargeFileRequest,
+	srv testv1.TestService_DownloadLargeFileServer,
+) error {
+	return srv.Send(&httpbody.HttpBody{
+		ContentType: "text/plain",
+		Data:        []byte(assets.LargeFile),
+	})
 }
