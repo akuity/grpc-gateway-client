@@ -24,6 +24,7 @@ const (
 	TestService_SendInvitation_FullMethodName      = "/io.akuity.test.v1.TestService/SendInvitation"
 	TestService_TrackInvitation_FullMethodName     = "/io.akuity.test.v1.TestService/TrackInvitation"
 	TestService_DownloadInvitations_FullMethodName = "/io.akuity.test.v1.TestService/DownloadInvitations"
+	TestService_DownloadLargeFile_FullMethodName   = "/io.akuity.test.v1.TestService/DownloadLargeFile"
 )
 
 // TestServiceClient is the client API for TestService service.
@@ -34,6 +35,7 @@ type TestServiceClient interface {
 	SendInvitation(ctx context.Context, in *SendInvitationRequest, opts ...grpc.CallOption) (*SendInvitationResponse, error)
 	TrackInvitation(ctx context.Context, in *TrackInvitationRequest, opts ...grpc.CallOption) (TestService_TrackInvitationClient, error)
 	DownloadInvitations(ctx context.Context, in *DownloadInvitationsRequest, opts ...grpc.CallOption) (TestService_DownloadInvitationsClient, error)
+	DownloadLargeFile(ctx context.Context, in *DownloadLargeFileRequest, opts ...grpc.CallOption) (TestService_DownloadLargeFileClient, error)
 }
 
 type testServiceClient struct {
@@ -126,6 +128,38 @@ func (x *testServiceDownloadInvitationsClient) Recv() (*httpbody.HttpBody, error
 	return m, nil
 }
 
+func (c *testServiceClient) DownloadLargeFile(ctx context.Context, in *DownloadLargeFileRequest, opts ...grpc.CallOption) (TestService_DownloadLargeFileClient, error) {
+	stream, err := c.cc.NewStream(ctx, &TestService_ServiceDesc.Streams[2], TestService_DownloadLargeFile_FullMethodName, opts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &testServiceDownloadLargeFileClient{stream}
+	if err := x.ClientStream.SendMsg(in); err != nil {
+		return nil, err
+	}
+	if err := x.ClientStream.CloseSend(); err != nil {
+		return nil, err
+	}
+	return x, nil
+}
+
+type TestService_DownloadLargeFileClient interface {
+	Recv() (*httpbody.HttpBody, error)
+	grpc.ClientStream
+}
+
+type testServiceDownloadLargeFileClient struct {
+	grpc.ClientStream
+}
+
+func (x *testServiceDownloadLargeFileClient) Recv() (*httpbody.HttpBody, error) {
+	m := new(httpbody.HttpBody)
+	if err := x.ClientStream.RecvMsg(m); err != nil {
+		return nil, err
+	}
+	return m, nil
+}
+
 // TestServiceServer is the server API for TestService service.
 // All implementations must embed UnimplementedTestServiceServer
 // for forward compatibility
@@ -134,6 +168,7 @@ type TestServiceServer interface {
 	SendInvitation(context.Context, *SendInvitationRequest) (*SendInvitationResponse, error)
 	TrackInvitation(*TrackInvitationRequest, TestService_TrackInvitationServer) error
 	DownloadInvitations(*DownloadInvitationsRequest, TestService_DownloadInvitationsServer) error
+	DownloadLargeFile(*DownloadLargeFileRequest, TestService_DownloadLargeFileServer) error
 	mustEmbedUnimplementedTestServiceServer()
 }
 
@@ -152,6 +187,9 @@ func (UnimplementedTestServiceServer) TrackInvitation(*TrackInvitationRequest, T
 }
 func (UnimplementedTestServiceServer) DownloadInvitations(*DownloadInvitationsRequest, TestService_DownloadInvitationsServer) error {
 	return status.Errorf(codes.Unimplemented, "method DownloadInvitations not implemented")
+}
+func (UnimplementedTestServiceServer) DownloadLargeFile(*DownloadLargeFileRequest, TestService_DownloadLargeFileServer) error {
+	return status.Errorf(codes.Unimplemented, "method DownloadLargeFile not implemented")
 }
 func (UnimplementedTestServiceServer) mustEmbedUnimplementedTestServiceServer() {}
 
@@ -244,6 +282,27 @@ func (x *testServiceDownloadInvitationsServer) Send(m *httpbody.HttpBody) error 
 	return x.ServerStream.SendMsg(m)
 }
 
+func _TestService_DownloadLargeFile_Handler(srv interface{}, stream grpc.ServerStream) error {
+	m := new(DownloadLargeFileRequest)
+	if err := stream.RecvMsg(m); err != nil {
+		return err
+	}
+	return srv.(TestServiceServer).DownloadLargeFile(m, &testServiceDownloadLargeFileServer{stream})
+}
+
+type TestService_DownloadLargeFileServer interface {
+	Send(*httpbody.HttpBody) error
+	grpc.ServerStream
+}
+
+type testServiceDownloadLargeFileServer struct {
+	grpc.ServerStream
+}
+
+func (x *testServiceDownloadLargeFileServer) Send(m *httpbody.HttpBody) error {
+	return x.ServerStream.SendMsg(m)
+}
+
 // TestService_ServiceDesc is the grpc.ServiceDesc for TestService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -269,6 +328,11 @@ var TestService_ServiceDesc = grpc.ServiceDesc{
 		{
 			StreamName:    "DownloadInvitations",
 			Handler:       _TestService_DownloadInvitations_Handler,
+			ServerStreams: true,
+		},
+		{
+			StreamName:    "DownloadLargeFile",
+			Handler:       _TestService_DownloadLargeFile_Handler,
 			ServerStreams: true,
 		},
 	},

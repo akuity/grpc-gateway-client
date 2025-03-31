@@ -17,6 +17,7 @@ type TestServiceGatewayClient interface {
 	SendInvitation(context.Context, *SendInvitationRequest) (*SendInvitationResponse, error)
 	TrackInvitation(context.Context, *TrackInvitationRequest) (<-chan *TrackInvitationResponse, <-chan error, error)
 	DownloadInvitations(context.Context, *DownloadInvitationsRequest) (<-chan *httpbody.HttpBody, <-chan error, error)
+	DownloadLargeFile(context.Context, *DownloadLargeFileRequest) (<-chan *httpbody.HttpBody, <-chan error, error)
 }
 
 func NewTestServiceGatewayClient(c gateway.Client) TestServiceGatewayClient {
@@ -64,5 +65,10 @@ func (c *testServiceGatewayClient) DownloadInvitations(ctx context.Context, req 
 		q.Add("type", req.Type.String())
 	}
 	gwReq.SetQueryParamsFromValues(q)
+	return gateway.DoStreamingRequest[httpbody.HttpBody](ctx, c.gwc, gwReq)
+}
+
+func (c *testServiceGatewayClient) DownloadLargeFile(ctx context.Context, req *DownloadLargeFileRequest) (<-chan *httpbody.HttpBody, <-chan error, error) {
+	gwReq := c.gwc.NewRequest("GET", "/download-large-file")
 	return gateway.DoStreamingRequest[httpbody.HttpBody](ctx, c.gwc, gwReq)
 }

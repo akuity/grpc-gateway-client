@@ -12,6 +12,7 @@ import (
 
 	"github.com/bufbuild/protoyaml-go"
 	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
+	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 	"google.golang.org/genproto/googleapis/api/httpbody"
 	"google.golang.org/grpc"
@@ -21,9 +22,12 @@ import (
 	"google.golang.org/grpc/test/bufconn"
 	"google.golang.org/protobuf/proto"
 
+	"github.com/akuity/grpc-gateway-client/internal/assets"
 	"github.com/akuity/grpc-gateway-client/internal/test/gen/testv1"
 	"github.com/akuity/grpc-gateway-client/internal/test/server"
 	"github.com/akuity/grpc-gateway-client/pkg/grpc/gateway"
+
+	_ "embed"
 )
 
 type RequestTestSuite struct {
@@ -139,6 +143,33 @@ read:
 	for idx := range actual {
 		s.Require().True(proto.Equal(expected[idx], actual[idx]))
 	}
+}
+
+func (s *RequestTestSuite) TestDownloadLargeFileRequest() {
+	ctx, cancel := context.WithTimeout(context.TODO(), 100*time.Millisecond)
+	defer cancel()
+	req := s.client.NewRequest(http.MethodGet, "/download-large-file")
+	resCh, errCh, err := gateway.DoStreamingRequest[httpbody.HttpBody](ctx, s.client, req)
+	s.Require().NoError(err)
+	var buf bytes.Buffer
+
+read:
+	for {
+		select {
+		case <-ctx.Done():
+			break read
+		case err := <-errCh:
+			s.Require().NoError(err)
+		case data, ok := <-resCh:
+			if !ok {
+				break read
+			}
+			buf.Write(data.GetData())
+		}
+	}
+
+	require.NoError(s.T(), ctx.Err())
+	require.Equal(s.T(), strings.TrimSpace(assets.LargeFile), strings.TrimSpace(buf.String()))
 }
 
 func (s *RequestTestSuite) TestDownloadRequest_Error() {

@@ -1,7 +1,6 @@
 package gateway
 
 import (
-	"bufio"
 	"bytes"
 	"context"
 	"encoding/json"
@@ -164,32 +163,17 @@ func doHTTPStreamingRequest(ctx context.Context, c Client, req *resty.Request) (
 		contentType := res.Header().Get("Content-Type")
 		body := res.RawBody()
 		defer func() { _ = body.Close() }()
-		r := bufio.NewReader(body)
-		for {
-			var data bytes.Buffer
-			for {
-				line, isPrefix, err := r.ReadLine()
-				if err != nil {
-					if errors.Is(err, io.EOF) {
-						close(resCh)
-						return
-					}
-					errCh <- fmt.Errorf("read line: %w", err)
-					return
-				}
-				if _, err := data.Write(append(line, '\n')); err != nil {
-					errCh <- fmt.Errorf("write line: %w", err)
-					return
-				}
-				if !isPrefix {
-					break
-				}
-			}
-			resCh <- &httpbody.HttpBody{
-				ContentType: contentType,
-				Data:        data.Bytes(),
-			}
+
+		var data bytes.Buffer
+		if _, err := io.Copy(&data, body); err != nil {
+			errCh <- fmt.Errorf("copy body: %w", err)
+			return
 		}
+		resCh <- &httpbody.HttpBody{
+			ContentType: contentType,
+			Data:        data.Bytes(),
+		}
+		close(resCh)
 	}()
 	return resCh, errCh, nil
 }

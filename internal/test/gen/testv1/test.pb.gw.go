@@ -174,6 +174,23 @@ func request_TestService_DownloadInvitations_0(ctx context.Context, marshaler ru
 
 }
 
+func request_TestService_DownloadLargeFile_0(ctx context.Context, marshaler runtime.Marshaler, client TestServiceClient, req *http.Request, pathParams map[string]string) (TestService_DownloadLargeFileClient, runtime.ServerMetadata, error) {
+	var protoReq DownloadLargeFileRequest
+	var metadata runtime.ServerMetadata
+
+	stream, err := client.DownloadLargeFile(ctx, &protoReq)
+	if err != nil {
+		return nil, metadata, err
+	}
+	header, err := stream.Header()
+	if err != nil {
+		return nil, metadata, err
+	}
+	metadata.HeaderMD = header
+	return stream, metadata, nil
+
+}
+
 // RegisterTestServiceHandlerServer registers the http handlers for service TestService to "mux".
 // UnaryRPC     :call TestServiceServer directly.
 // StreamingRPC :currently unsupported pending https://github.com/grpc/grpc-go/issues/906.
@@ -238,6 +255,13 @@ func RegisterTestServiceHandlerServer(ctx context.Context, mux *runtime.ServeMux
 	})
 
 	mux.Handle("GET", pattern_TestService_DownloadInvitations_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
+		err := status.Error(codes.Unimplemented, "streaming calls are not yet supported in the in-process transport")
+		_, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
+		runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
+		return
+	})
+
+	mux.Handle("GET", pattern_TestService_DownloadLargeFile_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
 		err := status.Error(codes.Unimplemented, "streaming calls are not yet supported in the in-process transport")
 		_, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
 		runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
@@ -373,6 +397,28 @@ func RegisterTestServiceHandlerClient(ctx context.Context, mux *runtime.ServeMux
 
 	})
 
+	mux.Handle("GET", pattern_TestService_DownloadLargeFile_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
+		ctx, cancel := context.WithCancel(req.Context())
+		defer cancel()
+		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
+		var err error
+		var annotatedContext context.Context
+		annotatedContext, err = runtime.AnnotateContext(ctx, mux, req, "/io.akuity.test.v1.TestService/DownloadLargeFile", runtime.WithHTTPPathPattern("/download-large-file"))
+		if err != nil {
+			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
+			return
+		}
+		resp, md, err := request_TestService_DownloadLargeFile_0(annotatedContext, inboundMarshaler, client, req, pathParams)
+		annotatedContext = runtime.NewServerMetadataContext(annotatedContext, md)
+		if err != nil {
+			runtime.HTTPError(annotatedContext, mux, outboundMarshaler, w, req, err)
+			return
+		}
+
+		forward_TestService_DownloadLargeFile_0(annotatedContext, mux, outboundMarshaler, w, req, func() (proto.Message, error) { return resp.Recv() }, mux.GetForwardResponseOptions()...)
+
+	})
+
 	return nil
 }
 
@@ -384,6 +430,8 @@ var (
 	pattern_TestService_TrackInvitation_0 = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 1, 0, 4, 1, 5, 1}, []string{"invitation", "id"}, ""))
 
 	pattern_TestService_DownloadInvitations_0 = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0}, []string{"download-invitations"}, ""))
+
+	pattern_TestService_DownloadLargeFile_0 = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0}, []string{"download-large-file"}, ""))
 )
 
 var (
@@ -394,4 +442,6 @@ var (
 	forward_TestService_TrackInvitation_0 = runtime.ForwardResponseStream
 
 	forward_TestService_DownloadInvitations_0 = runtime.ForwardResponseStream
+
+	forward_TestService_DownloadLargeFile_0 = runtime.ForwardResponseStream
 )
