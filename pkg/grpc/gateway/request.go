@@ -49,7 +49,7 @@ func DoRequest[T any](ctx context.Context, req *resty.Request) (*T, error) {
 		if err := status.ErrorProto(errRes); err != nil {
 			return nil, err
 		}
-		return nil, status.Error(HTTPStatusToCode(res.StatusCode()), errRes.String())
+		return nil, status.Error(HTTPStatusToCode(res.StatusCode()), res.String())
 	}
 
 	data, ok := res.Result().(*T)
@@ -136,7 +136,7 @@ func doHTTPRequest(ctx context.Context, req *resty.Request) (any, error) {
 		if err := status.ErrorProto(errRes); err != nil {
 			return nil, err
 		}
-		return nil, status.Error(HTTPStatusToCode(res.StatusCode()), errRes.String())
+		return nil, status.Error(HTTPStatusToCode(res.StatusCode()), res.String())
 	}
 	return &httpbody.HttpBody{
 		ContentType: res.Header().Get("Content-Type"),
