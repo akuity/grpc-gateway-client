@@ -105,6 +105,26 @@ func DoStreamingRequest[T any](ctx context.Context, c Client, req *resty.Request
 				errCh <- fmt.Errorf("unmarshal streaming response: %w", err)
 				return
 			}
+			// A server-streaming RPC that fails after emitting one or more
+			// results terminates the stream with a final {"error": <google.rpc.Status>}
+			// event. Surface it instead of skipping it; otherwise a truncated
+			// stream is indistinguishable from a successful one and the caller
+			// silently receives partial data.
+			if rawErr, ok := res[streamingResponseErrorKey]; ok {
+				var errResp rpcstatus.Status
+				if err := c.Unmarshal(rawErr, &errResp); err != nil {
+					errCh <- fmt.Errorf("unmarshal streaming error: %w", err)
+					return
+				}
+				if err := status.ErrorProto(&errResp); err != nil {
+					errCh <- err
+				} else {
+					// Defensive: an error event carrying an OK/empty status must
+					// still not read as a successful completion.
+					errCh <- errors.New("streaming response terminated with an error")
+				}
+				return
+			}
 			rawResult, ok := res[streamingResponseResultKey]
 			if !ok {
 				continue
@@ -185,6 +205,14 @@ func wrapStreamingResponseError(c Client, resp *resty.Response) error {
 	if err != nil {
 		return fmt.Errorf("read error response body: %w", err)
 	}
+
+	// A streaming handler that fails before its first message emits the error
+	// through the SSE marshaller, so the body is framed as `data: {"error":{...}}`.
+	// Strip that framing so the JSON underneath parses. This is a no-op for
+	// non-streaming (plain JSON) error bodies such as routing 404s, which start
+	// with '{' rather than the "data:" prefix.
+	data = bytes.TrimSpace(data)
+	data = bytes.TrimSpace(bytes.TrimPrefix(data, []byte("data:")))
 
 	var streamingResp streamingResponse
 	if err := json.Unmarshal(data, &streamingResp); err != nil {

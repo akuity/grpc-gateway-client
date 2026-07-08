@@ -96,6 +96,59 @@ func (s *RequestTestSuite) TestDoStreamingRequest() {
 	}
 }
 
+func (s *RequestTestSuite) TestDoStreamingRequest_ErrorAfterResults() {
+	ctx, cancel := context.WithTimeout(context.TODO(), time.Second)
+	defer cancel()
+
+	// TrackInvitation emits two results and then fails; grpc-gateway terminates
+	// the stream with a final {"error": ...} SSE event. That error must surface
+	// on errCh rather than being silently dropped, otherwise a truncated stream
+	// is indistinguishable from a successful one.
+	req := s.client.NewRequest(http.MethodGet, "/invitation/fail-after-events")
+	resCh, errCh, err := gateway.DoStreamingRequest[testv1.TrackInvitationResponse](ctx, s.client, req)
+	s.Require().NoError(err) // the stream starts 200 OK; the failure arrives mid-stream
+
+	var results int
+	var streamErr error
+read:
+	for {
+		select {
+		case <-ctx.Done():
+			s.FailNow("timed out; the terminal error was never delivered on errCh")
+		case e := <-errCh:
+			streamErr = e
+			break read
+		case _, ok := <-resCh:
+			if !ok {
+				break read // clean EOF; before the fix this is the (incorrect) path
+			}
+			results++
+		}
+	}
+
+	s.Require().Equal(2, results)
+	s.Require().Error(streamErr)
+	stat, ok := status.FromError(streamErr)
+	s.Require().True(ok)
+	s.Require().Equal(codes.Internal, stat.Code())
+}
+
+func (s *RequestTestSuite) TestDoStreamingRequest_ErrorBeforeResults() {
+	ctx, cancel := context.WithTimeout(context.TODO(), time.Second)
+	defer cancel()
+
+	// TrackInvitation fails before emitting any result. grpc-gateway sets the
+	// HTTP error status and writes the error through the SSE marshaller, so the
+	// body is framed as `data: {"error": ...}`. wrapStreamingResponseError must
+	// strip that framing and surface the real status, not collapse to Unknown.
+	req := s.client.NewRequest(http.MethodGet, "/invitation/fail-before-events")
+	_, _, err := gateway.DoStreamingRequest[testv1.TrackInvitationResponse](ctx, s.client, req)
+	s.Require().Error(err)
+	stat, ok := status.FromError(err)
+	s.Require().True(ok)
+	s.Require().Equal(codes.NotFound, stat.Code())
+}
+
 func (s *RequestTestSuite) TestDownloadRequest() {
 	ctx, cancel := context.WithTimeout(context.TODO(), 500*time.Millisecond)
 	defer cancel()
