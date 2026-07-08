@@ -133,6 +133,22 @@ read:
 	s.Require().Equal(codes.Internal, stat.Code())
 }
 
+func (s *RequestTestSuite) TestDoStreamingRequest_ErrorBeforeResults() {
+	ctx, cancel := context.WithTimeout(context.TODO(), time.Second)
+	defer cancel()
+
+	// TrackInvitation fails before emitting any result. grpc-gateway sets the
+	// HTTP error status and writes the error through the SSE marshaller, so the
+	// body is framed as `data: {"error": ...}`. wrapStreamingResponseError must
+	// strip that framing and surface the real status, not collapse to Unknown.
+	req := s.client.NewRequest(http.MethodGet, "/invitation/fail-before-events")
+	_, _, err := gateway.DoStreamingRequest[testv1.TrackInvitationResponse](ctx, s.client, req)
+	s.Require().Error(err)
+	stat, ok := status.FromError(err)
+	s.Require().True(ok)
+	s.Require().Equal(codes.NotFound, stat.Code())
+}
+
 func (s *RequestTestSuite) TestDownloadRequest() {
 	ctx, cancel := context.WithTimeout(context.TODO(), 500*time.Millisecond)
 	defer cancel()

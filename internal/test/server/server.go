@@ -43,6 +43,12 @@ func (s *testServiceServer) SendInvitation(_ context.Context, req *testv1.SendIn
 }
 
 func (s *testServiceServer) TrackInvitation(req *testv1.TrackInvitationRequest, srv testv1.TestService_TrackInvitationServer) error {
+	// Used by tests to exercise a server stream that fails *before* its first
+	// message. grpc-gateway writes this through the SSE marshaller too, so the
+	// HTTP error body is framed as `data: {"error": ...}`.
+	if req.GetId() == "fail-before-events" {
+		return status.Error(codes.NotFound, "nope")
+	}
 	eventTypes := []testv1.EventType{
 		testv1.EventType_EVENT_TYPE_SEEN,
 		testv1.EventType_EVENT_TYPE_ACCEPTED,

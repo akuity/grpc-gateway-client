@@ -206,6 +206,14 @@ func wrapStreamingResponseError(c Client, resp *resty.Response) error {
 		return fmt.Errorf("read error response body: %w", err)
 	}
 
+	// A streaming handler that fails before its first message emits the error
+	// through the SSE marshaller, so the body is framed as `data: {"error":{...}}`.
+	// Strip that framing so the JSON underneath parses. This is a no-op for
+	// non-streaming (plain JSON) error bodies such as routing 404s, which start
+	// with '{' rather than the "data:" prefix.
+	data = bytes.TrimSpace(data)
+	data = bytes.TrimSpace(bytes.TrimPrefix(data, []byte("data:")))
+
 	var streamingResp streamingResponse
 	if err := json.Unmarshal(data, &streamingResp); err != nil {
 		return fmt.Errorf("unmarshal raw response: %w", err)
