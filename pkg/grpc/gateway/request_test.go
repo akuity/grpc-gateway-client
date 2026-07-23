@@ -356,16 +356,24 @@ read:
 
 // TestDoStreamingRequest_SSEFramingCROnly streams events framed with bare CR
 // line endings, which the SSE grammar permits alongside CRLF and LF. The
-// decoder must deliver such events while the connection is open and close
-// cleanly afterwards, rather than blocking until closure and reporting the
-// well-formed stream as a truncation.
+// handler flushes the first event and keeps the connection open until the
+// test has received it: a CR-terminated event must be delivered while the
+// stream is live, not deferred until the next byte arrives or the stream
+// closes.
 func (s *RequestTestSuite) TestDoStreamingRequest_SSEFramingCROnly() {
 	ctx, cancel := context.WithTimeout(context.TODO(), 5*time.Second)
 	defer cancel()
 
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+	firstReceived := make(chan struct{})
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/event-stream")
 		_, _ = w.Write([]byte("data: {\"result\":{\"type\":\"EVENT_TYPE_SEEN\",\"message\":\"first\"}}\r\r"))
+		w.(http.Flusher).Flush()
+		select {
+		case <-firstReceived:
+		case <-r.Context().Done():
+			return
+		}
 		_, _ = w.Write([]byte("data: {\"result\":{\"type\":\"EVENT_TYPE_SEEN\",\"message\":\"second\"}}\r\r"))
 	}))
 	defer srv.Close()
@@ -380,7 +388,7 @@ read:
 	for {
 		select {
 		case <-ctx.Done():
-			s.FailNow("timed out waiting for CR-framed events")
+			s.FailNow("timed out; a CR-terminated event was not delivered while the stream was open")
 		case e := <-errCh:
 			s.Require().NoError(e)
 		case data, ok := <-resCh:
@@ -388,6 +396,9 @@ read:
 				break read
 			}
 			results = append(results, data.GetMessage())
+			if len(results) == 1 {
+				close(firstReceived)
+			}
 		}
 	}
 	s.Require().Equal([]string{"first", "second"}, results)

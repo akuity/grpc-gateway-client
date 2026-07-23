@@ -150,6 +150,13 @@ func DoStreamingRequest[T any](ctx context.Context, c Client, req *resty.Request
 // completed — the caller received partial data with no error.
 type sseEventDecoder struct {
 	r *bufio.Reader
+	// skipLF records that the previous line was terminated by a bare CR whose
+	// following byte has not been read yet. If that byte turns out to be LF it
+	// is the second half of a CRLF pair and must be swallowed, per the SSE
+	// parsing algorithm. Tracking this across reads (instead of peeking ahead
+	// synchronously) lets a CR-terminated line be delivered immediately even
+	// when the CR is the last byte the server has flushed so far.
+	skipLF bool
 }
 
 func newSSEEventDecoder(r io.Reader) *sseEventDecoder {
@@ -213,16 +220,17 @@ func (d *sseEventDecoder) readLine() (string, error) {
 		if err != nil {
 			return string(line), err
 		}
+		if d.skipLF {
+			d.skipLF = false
+			if b == '\n' {
+				continue
+			}
+		}
 		switch b {
 		case '\n':
 			return string(line), nil
 		case '\r':
-			// Consume the LF of a CRLF pair, if present. A Peek error is
-			// left for the next call to report: the CR alone already
-			// terminates this line.
-			if next, err := d.r.Peek(1); err == nil && next[0] == '\n' {
-				_, _ = d.r.ReadByte()
-			}
+			d.skipLF = true
 			return string(line), nil
 		default:
 			line = append(line, b)
