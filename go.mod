@@ -1,6 +1,6 @@
 module github.com/akuity/grpc-gateway-client
 
-go 1.20
+go 1.21
 
 require (
 	github.com/alevinval/sse v1.0.1

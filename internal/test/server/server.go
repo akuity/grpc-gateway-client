@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/base64"
+	"strings"
 	"time"
 
 	"github.com/bufbuild/protoyaml-go"
@@ -48,6 +49,21 @@ func (s *testServiceServer) TrackInvitation(req *testv1.TrackInvitationRequest, 
 	// HTTP error body is framed as `data: {"error": ...}`.
 	if req.GetId() == "fail-before-events" {
 		return status.Error(codes.NotFound, "nope")
+	}
+	// Used by tests to exercise events whose SSE data line far exceeds
+	// bufio.MaxScanTokenSize (64KiB): a line-limited decoder either errors or,
+	// worse, silently truncates the stream.
+	if req.GetId() == "large-events" {
+		large := strings.Repeat("x", 300*1024)
+		for i := 0; i < 3; i++ {
+			if err := srv.Send(&testv1.TrackInvitationResponse{
+				Type:    testv1.EventType_EVENT_TYPE_SEEN,
+				Message: large,
+			}); err != nil {
+				return err
+			}
+		}
+		return nil
 	}
 	eventTypes := []testv1.EventType{
 		testv1.EventType_EVENT_TYPE_SEEN,

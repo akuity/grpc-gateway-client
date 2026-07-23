@@ -1,14 +1,15 @@
 package gateway
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
+	"strings"
 
-	"github.com/alevinval/sse/pkg/decoder"
 	"github.com/go-resty/resty/v2"
 	"google.golang.org/genproto/googleapis/api/httpbody"
 	rpcstatus "google.golang.org/genproto/googleapis/rpc/status"
@@ -88,9 +89,9 @@ func DoStreamingRequest[T any](ctx context.Context, c Client, req *resty.Request
 	go func() {
 		body := rawRes.RawBody()
 		defer func() { _ = body.Close() }()
-		eventDecoder := decoder.New(body)
+		eventDecoder := newSSEEventDecoder(body)
 		for {
-			event, err := eventDecoder.Decode()
+			payload, err := eventDecoder.next()
 			if err != nil {
 				if errors.Is(err, io.EOF) {
 					close(resCh)
@@ -101,7 +102,7 @@ func DoStreamingRequest[T any](ctx context.Context, c Client, req *resty.Request
 			}
 
 			var res streamingResponse
-			if err := json.Unmarshal([]byte(event.GetData()), &res); err != nil {
+			if err := json.Unmarshal([]byte(payload), &res); err != nil {
 				errCh <- fmt.Errorf("unmarshal streaming response: %w", err)
 				return
 			}
@@ -139,6 +140,102 @@ func DoStreamingRequest[T any](ctx context.Context, c Client, req *resty.Request
 		}
 	}()
 	return resCh, errCh, nil
+}
+
+// sseEventDecoder reads Server-Sent Events without any line-length limit and
+// propagates transport errors instead of flattening them into EOF. The
+// alevinval/sse decoder it replaces capped lines at bufio.MaxScanTokenSize
+// (64KiB) and returned io.EOF for every scanner failure, so an oversized or
+// mid-line-interrupted event silently ended the stream as if it had
+// completed — the caller received partial data with no error.
+type sseEventDecoder struct {
+	r *bufio.Reader
+	// skipLF records that the previous line was terminated by a bare CR whose
+	// following byte has not been read yet. If that byte turns out to be LF it
+	// is the second half of a CRLF pair and must be swallowed, per the SSE
+	// parsing algorithm. Tracking this across reads (instead of peeking ahead
+	// synchronously) lets a CR-terminated line be delivered immediately even
+	// when the CR is the last byte the server has flushed so far.
+	skipLF bool
+}
+
+func newSSEEventDecoder(r io.Reader) *sseEventDecoder {
+	return &sseEventDecoder{r: bufio.NewReader(r)}
+}
+
+// next returns the data payload of the next event. io.EOF marks a clean
+// end-of-stream at an event boundary; an EOF that interrupts a partially
+// read event surfaces as io.ErrUnexpectedEOF so truncation is never mistaken
+// for successful completion. Non-data fields (event, id, retry) and comment
+// lines are ignored: the grpc-gateway SSE framing carries everything in
+// `data:` lines.
+func (d *sseEventDecoder) next() (string, error) {
+	var data bytes.Buffer
+	dataSeen := false
+	for {
+		line, err := d.readLine()
+		if err != nil {
+			if errors.Is(err, io.EOF) {
+				if line != "" || dataSeen {
+					return "", io.ErrUnexpectedEOF
+				}
+				return "", io.EOF
+			}
+			return "", err
+		}
+
+		if line == "" {
+			if dataSeen {
+				return data.String(), nil
+			}
+			continue
+		}
+
+		field, value, _ := strings.Cut(line, ":")
+		if field == "" {
+			// Comment line (":heartbeat" and friends).
+			continue
+		}
+		if field == "data" {
+			// Per the SSE spec, multiple data lines of one event are joined
+			// with a newline, and a single leading space is trimmed.
+			if dataSeen {
+				data.WriteByte('\n')
+			}
+			data.WriteString(strings.TrimPrefix(value, " "))
+			dataSeen = true
+		}
+	}
+}
+
+// readLine reads one line terminated by LF, CRLF, or bare CR — the three
+// end-of-line sequences the SSE grammar permits. The terminator is consumed
+// and excluded from the returned line. A non-nil error means the line was
+// never terminated; for io.EOF the bytes read so far are returned alongside
+// it so the caller can tell a clean boundary from a truncated line.
+func (d *sseEventDecoder) readLine() (string, error) {
+	var line []byte
+	for {
+		b, err := d.r.ReadByte()
+		if err != nil {
+			return string(line), err
+		}
+		if d.skipLF {
+			d.skipLF = false
+			if b == '\n' {
+				continue
+			}
+		}
+		switch b {
+		case '\n':
+			return string(line), nil
+		case '\r':
+			d.skipLF = true
+			return string(line), nil
+		default:
+			line = append(line, b)
+		}
+	}
 }
 
 func doHTTPRequest(ctx context.Context, req *resty.Request) (any, error) {

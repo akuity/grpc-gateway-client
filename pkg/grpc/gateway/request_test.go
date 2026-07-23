@@ -239,6 +239,171 @@ func (s *RequestTestSuite) TestDownloadRequest_Error() {
 	s.Require().Equal(codes.InvalidArgument, stat.Code())
 }
 
+// TestDoStreamingRequest_LargeEvents streams events whose SSE data line far
+// exceeds bufio.MaxScanTokenSize (64KiB) through the real gRPC -> grpc-gateway
+// -> SSE pipeline. The previous alevinval/sse-based decoder capped lines at
+// 64KiB and flattened the resulting bufio.ErrTooLong into io.EOF, so the
+// stream silently ended after zero results while reporting success.
+func (s *RequestTestSuite) TestDoStreamingRequest_LargeEvents() {
+	ctx, cancel := context.WithTimeout(context.TODO(), 5*time.Second)
+	defer cancel()
+
+	req := s.client.NewRequest(http.MethodGet, "/invitation/large-events")
+	resCh, errCh, err := gateway.DoStreamingRequest[testv1.TrackInvitationResponse](ctx, s.client, req)
+	s.Require().NoError(err)
+
+	var results int
+read:
+	for {
+		select {
+		case <-ctx.Done():
+			s.FailNow("timed out waiting for large events")
+		case e := <-errCh:
+			s.Require().NoError(e)
+		case data, ok := <-resCh:
+			if !ok {
+				break read
+			}
+			s.Require().Len(data.GetMessage(), 300*1024, "large event payload must arrive intact")
+			results++
+		}
+	}
+	s.Require().Equal(3, results, "every oversized event must be delivered, not silently dropped")
+}
+
+// TestDoStreamingRequest_TruncatedStreamSurfacesError cuts the connection in
+// the middle of an event. A transport-level truncation must surface as an
+// error on errCh — never as a clean close that makes partial data look like a
+// successful, complete stream.
+func (s *RequestTestSuite) TestDoStreamingRequest_TruncatedStreamSurfacesError() {
+	ctx, cancel := context.WithTimeout(context.TODO(), 5*time.Second)
+	defer cancel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "text/event-stream")
+		_, _ = w.Write([]byte("data: {\"result\":{\"type\":\"EVENT_TYPE_SEEN\",\"message\":\"first\"}}\n\n"))
+		_, _ = w.Write([]byte("data: {\"result\":{\"type\":\"EVENT_TYPE_SEEN\",\"mess"))
+		// Connection closes mid-event with no terminating blank line.
+	}))
+	defer srv.Close()
+
+	client := gateway.NewClient(srv.URL)
+	req := client.NewRequest(http.MethodGet, "/anything")
+	resCh, errCh, err := gateway.DoStreamingRequest[testv1.TrackInvitationResponse](ctx, client, req)
+	s.Require().NoError(err)
+
+	var results int
+	var streamErr error
+read:
+	for {
+		select {
+		case <-ctx.Done():
+			s.FailNow("timed out; the truncation was never surfaced on errCh")
+		case e := <-errCh:
+			streamErr = e
+			break read
+		case data, ok := <-resCh:
+			if !ok {
+				s.FailNow("truncated stream closed cleanly; partial data was presented as success")
+			}
+			s.Require().Equal("first", data.GetMessage())
+			results++
+		}
+	}
+	s.Require().Equal(1, results)
+	s.Require().Error(streamErr)
+}
+
+// TestDoStreamingRequest_SSEFraming exercises SSE framing details the decoder
+// must keep supporting: comment/heartbeat lines, CRLF line endings, and one
+// event's payload split across multiple data lines (joined with a newline per
+// the SSE spec).
+func (s *RequestTestSuite) TestDoStreamingRequest_SSEFraming() {
+	ctx, cancel := context.WithTimeout(context.TODO(), 5*time.Second)
+	defer cancel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "text/event-stream")
+		_, _ = w.Write([]byte(": heartbeat\n"))
+		_, _ = w.Write([]byte("data: {\"result\":\r\n"))
+		_, _ = w.Write([]byte("data: {\"type\":\"EVENT_TYPE_SEEN\",\"message\":\"joined\"}}\r\n"))
+		_, _ = w.Write([]byte("\r\n"))
+	}))
+	defer srv.Close()
+
+	client := gateway.NewClient(srv.URL)
+	req := client.NewRequest(http.MethodGet, "/anything")
+	resCh, errCh, err := gateway.DoStreamingRequest[testv1.TrackInvitationResponse](ctx, client, req)
+	s.Require().NoError(err)
+
+	var results []string
+read:
+	for {
+		select {
+		case <-ctx.Done():
+			s.FailNow("timed out waiting for framed event")
+		case e := <-errCh:
+			s.Require().NoError(e)
+		case data, ok := <-resCh:
+			if !ok {
+				break read
+			}
+			results = append(results, data.GetMessage())
+		}
+	}
+	s.Require().Equal([]string{"joined"}, results)
+}
+
+// TestDoStreamingRequest_SSEFramingCROnly streams events framed with bare CR
+// line endings, which the SSE grammar permits alongside CRLF and LF. The
+// handler flushes the first event and keeps the connection open until the
+// test has received it: a CR-terminated event must be delivered while the
+// stream is live, not deferred until the next byte arrives or the stream
+// closes.
+func (s *RequestTestSuite) TestDoStreamingRequest_SSEFramingCROnly() {
+	ctx, cancel := context.WithTimeout(context.TODO(), 5*time.Second)
+	defer cancel()
+
+	firstReceived := make(chan struct{})
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/event-stream")
+		_, _ = w.Write([]byte("data: {\"result\":{\"type\":\"EVENT_TYPE_SEEN\",\"message\":\"first\"}}\r\r"))
+		w.(http.Flusher).Flush()
+		select {
+		case <-firstReceived:
+		case <-r.Context().Done():
+			return
+		}
+		_, _ = w.Write([]byte("data: {\"result\":{\"type\":\"EVENT_TYPE_SEEN\",\"message\":\"second\"}}\r\r"))
+	}))
+	defer srv.Close()
+
+	client := gateway.NewClient(srv.URL)
+	req := client.NewRequest(http.MethodGet, "/anything")
+	resCh, errCh, err := gateway.DoStreamingRequest[testv1.TrackInvitationResponse](ctx, client, req)
+	s.Require().NoError(err)
+
+	var results []string
+read:
+	for {
+		select {
+		case <-ctx.Done():
+			s.FailNow("timed out; a CR-terminated event was not delivered while the stream was open")
+		case e := <-errCh:
+			s.Require().NoError(e)
+		case data, ok := <-resCh:
+			if !ok {
+				break read
+			}
+			results = append(results, data.GetMessage())
+			if len(results) == 1 {
+				close(firstReceived)
+			}
+		}
+	}
+	s.Require().Equal([]string{"first", "second"}, results)
+}
+
 func (s *RequestTestSuite) TearDownTest() {
 	s.gwSrv.Close()
 	s.grpcSrv.Stop()
