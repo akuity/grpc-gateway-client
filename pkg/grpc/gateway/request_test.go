@@ -354,6 +354,45 @@ read:
 	s.Require().Equal([]string{"joined"}, results)
 }
 
+// TestDoStreamingRequest_SSEFramingCROnly streams events framed with bare CR
+// line endings, which the SSE grammar permits alongside CRLF and LF. The
+// decoder must deliver such events while the connection is open and close
+// cleanly afterwards, rather than blocking until closure and reporting the
+// well-formed stream as a truncation.
+func (s *RequestTestSuite) TestDoStreamingRequest_SSEFramingCROnly() {
+	ctx, cancel := context.WithTimeout(context.TODO(), 5*time.Second)
+	defer cancel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "text/event-stream")
+		_, _ = w.Write([]byte("data: {\"result\":{\"type\":\"EVENT_TYPE_SEEN\",\"message\":\"first\"}}\r\r"))
+		_, _ = w.Write([]byte("data: {\"result\":{\"type\":\"EVENT_TYPE_SEEN\",\"message\":\"second\"}}\r\r"))
+	}))
+	defer srv.Close()
+
+	client := gateway.NewClient(srv.URL)
+	req := client.NewRequest(http.MethodGet, "/anything")
+	resCh, errCh, err := gateway.DoStreamingRequest[testv1.TrackInvitationResponse](ctx, client, req)
+	s.Require().NoError(err)
+
+	var results []string
+read:
+	for {
+		select {
+		case <-ctx.Done():
+			s.FailNow("timed out waiting for CR-framed events")
+		case e := <-errCh:
+			s.Require().NoError(e)
+		case data, ok := <-resCh:
+			if !ok {
+				break read
+			}
+			results = append(results, data.GetMessage())
+		}
+	}
+	s.Require().Equal([]string{"first", "second"}, results)
+}
+
 func (s *RequestTestSuite) TearDownTest() {
 	s.gwSrv.Close()
 	s.grpcSrv.Stop()

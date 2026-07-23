@@ -166,18 +166,16 @@ func (d *sseEventDecoder) next() (string, error) {
 	var data bytes.Buffer
 	dataSeen := false
 	for {
-		line, err := d.r.ReadString('\n')
+		line, err := d.readLine()
 		if err != nil {
 			if errors.Is(err, io.EOF) {
-				if len(line) > 0 || dataSeen {
+				if line != "" || dataSeen {
 					return "", io.ErrUnexpectedEOF
 				}
 				return "", io.EOF
 			}
 			return "", err
 		}
-		line = strings.TrimSuffix(line, "\n")
-		line = strings.TrimSuffix(line, "\r")
 
 		if line == "" {
 			if dataSeen {
@@ -199,6 +197,35 @@ func (d *sseEventDecoder) next() (string, error) {
 			}
 			data.WriteString(strings.TrimPrefix(value, " "))
 			dataSeen = true
+		}
+	}
+}
+
+// readLine reads one line terminated by LF, CRLF, or bare CR — the three
+// end-of-line sequences the SSE grammar permits. The terminator is consumed
+// and excluded from the returned line. A non-nil error means the line was
+// never terminated; for io.EOF the bytes read so far are returned alongside
+// it so the caller can tell a clean boundary from a truncated line.
+func (d *sseEventDecoder) readLine() (string, error) {
+	var line []byte
+	for {
+		b, err := d.r.ReadByte()
+		if err != nil {
+			return string(line), err
+		}
+		switch b {
+		case '\n':
+			return string(line), nil
+		case '\r':
+			// Consume the LF of a CRLF pair, if present. A Peek error is
+			// left for the next call to report: the CR alone already
+			// terminates this line.
+			if next, err := d.r.Peek(1); err == nil && next[0] == '\n' {
+				_, _ = d.r.ReadByte()
+			}
+			return string(line), nil
+		default:
+			line = append(line, b)
 		}
 	}
 }
