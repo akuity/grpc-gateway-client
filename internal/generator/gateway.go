@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"google.golang.org/genproto/googleapis/api/annotations"
+	"google.golang.org/genproto/googleapis/api/visibility"
 	"google.golang.org/protobuf/compiler/protogen"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/reflect/protoreflect"
@@ -110,6 +111,22 @@ func generateQueryParam(
 	queryKeyName := newStructAccessor(queryKeyFields, field.Desc.JSONName())
 	queryValueAccessor := newStructAccessor(structFields, field.GoName)
 
+	if field.Oneof != nil {
+		queryValueAccessor = newStructAccessor(structFields, field.Oneof.GoName)
+	}
+
+	var restrictions []string
+	if proto.HasExtension(field.Desc.Options(), visibility.E_FieldVisibility) {
+		ext := proto.GetExtension(field.Desc.Options(), visibility.E_FieldVisibility)
+		if opts, ok := ext.(*visibility.VisibilityRule); ok {
+			restrictions = strings.Split(strings.TrimSpace(opts.Restriction), ",")
+		}
+	}
+
+	if len(restrictions) > 0 {
+		return
+	}
+
 	// If current field is inside the repeated message, ignore intermediate fields
 	// since the loopValueAccessor directs the current field itself.
 	if len(structFields) > 1 && structFields[0] == loopValueAccessor {
@@ -167,6 +184,9 @@ func generateParamValues(g *protogen.GeneratedFile, m *protogen.Method) {
 		if strings.Contains(rule.Pattern, fmt.Sprintf("{%s}", fieldName)) {
 			pathFields[fieldName] = true
 			valueAccessor := newStructAccessor([]string{"req"}, field.GoName)
+			if field.Oneof != nil {
+				valueAccessor = newStructAccessor([]string{"req"}, field.Oneof.GoName)
+			}
 			if field.Desc.Enum() != nil {
 				g.P(`gwReq.SetPathParam("`, fieldName, `", `, valueAccessor, ".String())")
 			} else {
